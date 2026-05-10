@@ -4,7 +4,7 @@ import type { Ship } from '../types';
 import { api } from '../utils/api';
 import { AIBriefing } from './AIBriefing';
 
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+import { BACKEND as BASE } from '../lib/api';
 
 interface RouteCandidate {
     label: string;

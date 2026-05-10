@@ -1,7 +1,7 @@
 // src/utils/api.ts
 import { normalizeFleet } from './normalize';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { BACKEND as BASE } from '../lib/api';
 
 export const api = {
     async getFleet() {
