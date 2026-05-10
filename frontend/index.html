@@ -1,13 +1,1391 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAVCOM // FLEET OPS — Command Intelligence Platform</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #05080f;
+      --bg-secondary: #0a0e1a;
+      --bg-panel: rgba(10, 18, 35, 0.92);
+      --bg-panel-border: rgba(0, 212, 255, 0.15);
+      --cyan: #00d4ff;
+      --cyan-bright: #00ffee;
+      --cyan-dim: rgba(0, 212, 255, 0.4);
+      --green: #00ff88;
+      --green-dim: rgba(0, 255, 136, 0.5);
+      --red: #ff0055;
+      --red-dim: rgba(255, 0, 85, 0.6);
+      --amber: #ffaa00;
+      --amber-dim: rgba(255, 170, 0, 0.5);
+      --text-primary: #e8f4ff;
+      --text-secondary: #7a9bb5;
+      --text-muted: #3a5570;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Rajdhani', sans-serif;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* ── SCANLINE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg,
+          transparent,
+          transparent 2px,
+          rgba(0, 0, 0, 0.08) 2px,
+          rgba(0, 0, 0, 0.08) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── NOISE GRAIN ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9998;
+      opacity: 0.4;
+    }
+
+    /* ── TOP NAV ── */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 52px;
+      background: rgba(5, 8, 15, 0.95);
+      border-bottom: 1px solid var(--bg-panel-border);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav-logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.12em;
+      color: var(--text-primary);
+    }
+
+    .nav-logo span {
+      color: var(--cyan);
+      margin-left: 6px;
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      vertical-align: middle;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: var(--text-secondary);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: var(--cyan);
+    }
+
+    .nav-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--green);
+      letter-spacing: 0.1em;
+    }
+
+    .nav-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse-green 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-green {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.5);
+      }
+
+      50% {
+        box-shadow: 0 0 0 5px rgba(0, 255, 136, 0);
+      }
+    }
+
+    /* ── HERO ── */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+      padding: 52px 0 0;
+    }
+
+    /* Background grid */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+    }
+
+    /* Glowing diagonal accent lines */
+    .hero-lines {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .hero-lines::before {
+      content: '';
+      position: absolute;
+      top: 15%;
+      left: -10%;
+      width: 140%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan-dim), transparent);
+      transform: rotate(-12deg);
+      animation: scan-line 6s linear infinite;
+    }
+
+    .hero-lines::after {
+      content: '';
+      position: absolute;
+      top: 35%;
+      left: -10%;
+      width: 140%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.3), transparent);
+      transform: rotate(-12deg);
+      animation: scan-line 6s linear infinite 2s;
+    }
+
+    @keyframes scan-line {
+      0% {
+        opacity: 0;
+        transform: rotate(-12deg) translateX(-20%);
+      }
+
+      20% {
+        opacity: 1;
+      }
+
+      80% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+        transform: rotate(-12deg) translateX(20%);
+      }
+    }
+
+    /* Large radar circle bg */
+    .hero-radar-bg {
+      position: absolute;
+      right: -200px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 212, 255, 0.08);
+      box-shadow:
+        inset 0 0 200px rgba(0, 212, 255, 0.04),
+        0 0 200px rgba(0, 212, 255, 0.04);
+    }
+
+    .hero-radar-bg::before {
+      content: '';
+      position: absolute;
+      inset: 80px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 212, 255, 0.06);
+    }
+
+    .hero-radar-bg::after {
+      content: '';
+      position: absolute;
+      inset: 200px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 212, 255, 0.05);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 10;
+      padding: 0 80px;
+      max-width: 1400px;
+    }
+
+    .hero-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .hero-eyebrow-line {
+      width: 40px;
+      height: 1px;
+      background: var(--red);
+    }
+
+    .hero-eyebrow-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.25em;
+      color: var(--red);
+      text-transform: uppercase;
+      animation: blink-red 2s step-end infinite;
+    }
+
+    @keyframes blink-red {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.4
+      }
+    }
+
+    .hero-eyebrow-badge {
+      margin-left: 8px;
+      padding: 2px 8px;
+      background: rgba(255, 0, 85, 0.15);
+      border: 1px solid rgba(255, 0, 85, 0.4);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--red);
+      letter-spacing: 0.1em;
+    }
+
+    h1.hero-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(5rem, 12vw, 13rem);
+      line-height: 0.88;
+      letter-spacing: 0.02em;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    h1.hero-title .cyan {
+      color: var(--cyan);
+    }
+
+    h1.hero-title .dim {
+      color: var(--text-muted);
+    }
+
+    .hero-subtitle {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.82rem;
+      letter-spacing: 0.18em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin: 24px 0 48px;
+      max-width: 540px;
+      line-height: 1.7;
+    }
+
+    .hero-subtitle strong {
+      color: var(--cyan-bright);
+      font-weight: 400;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 36px;
+      background: var(--cyan);
+      color: var(--bg-primary);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-decoration: none;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-primary:hover::before {
+      opacity: 0.15;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 40px rgba(0, 212, 255, 0.5);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 32px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1px solid var(--text-muted);
+      cursor: pointer;
+      transition: all 0.25s;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--cyan-dim);
+      color: var(--cyan);
+    }
+
+    /* Stats strip */
+    .hero-stats {
+      display: flex;
+      gap: 48px;
+      margin-top: 64px;
+      padding-top: 32px;
+      border-top: 1px solid rgba(0, 212, 255, 0.1);
+    }
+
+    .hero-stat {}
+
+    .hero-stat-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.8rem;
+      color: var(--cyan);
+      line-height: 1;
+      letter-spacing: 0.05em;
+    }
+
+    .hero-stat-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Live ship blips */
+    .ship-blip {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      animation: blip-pulse 2.5s ease-in-out infinite;
+    }
+
+    .ship-blip.cyan {
+      background: var(--cyan);
+      animation-delay: 0s;
+    }
+
+    .ship-blip.green {
+      background: var(--green);
+      animation-delay: 0.6s;
+    }
+
+    .ship-blip.amber {
+      background: var(--amber);
+      animation-delay: 1.2s;
+    }
+
+    .ship-blip.red {
+      background: var(--red);
+      animation-delay: 0.3s;
+    }
+
+    @keyframes blip-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 currentColor;
+        opacity: 0.9;
+      }
+
+      50% {
+        box-shadow: 0 0 0 8px transparent;
+        opacity: 1;
+      }
+    }
+
+    /* ── ALERT TICKER ── */
+    .ticker-wrap {
+      background: rgba(255, 0, 85, 0.08);
+      border-top: 1px solid rgba(255, 0, 85, 0.25);
+      border-bottom: 1px solid rgba(255, 0, 85, 0.25);
+      padding: 10px 0;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .ticker-label {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      padding: 0 20px;
+      background: var(--red);
+      color: var(--bg-primary);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.15em;
+      display: flex;
+      align-items: center;
+      z-index: 2;
+      font-weight: 700;
+    }
+
+    .ticker-track {
+      display: inline-block;
+      animation: ticker-scroll 28s linear infinite;
+      padding-left: 120px;
+    }
+
+    .ticker-item {
+      display: inline-block;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--red);
+      letter-spacing: 0.1em;
+      margin-right: 60px;
+    }
+
+    .ticker-item span {
+      color: var(--amber);
+    }
+
+    @keyframes ticker-scroll {
+      0% {
+        transform: translateX(0);
+      }
+
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+
+    /* ── FEATURES SECTION ── */
+    #features {
+      padding: 120px 80px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 64px;
+    }
+
+    .section-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--cyan-dim);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      letter-spacing: 0.05em;
+      line-height: 0.95;
+      color: var(--text-primary);
+    }
+
+    .section-title .accent {
+      color: var(--cyan);
+    }
+
+    .section-desc {
+      max-width: 320px;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      text-align: right;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .feature-card {
+      position: relative;
+      padding: 40px 36px;
+      background: var(--bg-panel);
+      border: 1px solid var(--bg-panel-border);
+      overflow: hidden;
+      transition: all 0.3s;
+      cursor: default;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan-dim), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-card:hover {
+      background: rgba(10, 25, 50, 0.95);
+      border-color: var(--cyan-dim);
+    }
+
+    .feature-num {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 5rem;
+      color: rgba(0, 212, 255, 0.06);
+      line-height: 1;
+      pointer-events: none;
+      transition: color 0.3s;
+    }
+
+    .feature-card:hover .feature-num {
+      color: rgba(0, 212, 255, 0.1);
+    }
+
+    .feature-icon {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--cyan-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      color: var(--cyan);
+      font-size: 1.1rem;
+      transition: all 0.3s;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+    }
+
+    .feature-card:hover .feature-icon {
+      background: rgba(0, 212, 255, 0.1);
+    }
+
+    .feature-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .feature-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 3px 10px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--cyan-dim);
+      letter-spacing: 0.12em;
+    }
+
+    /* special cards */
+    .feature-card.alert {
+      border-color: rgba(255, 0, 85, 0.2);
+    }
+
+    .feature-card.alert .feature-icon {
+      border-color: rgba(255, 0, 85, 0.4);
+      color: var(--red);
+    }
+
+    .feature-card.alert::before {
+      background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.3), transparent);
+    }
+
+    .feature-card.amber-card {
+      border-color: rgba(255, 170, 0, 0.2);
+    }
+
+    .feature-card.amber-card .feature-icon {
+      border-color: rgba(255, 170, 0, 0.4);
+      color: var(--amber);
+    }
+
+    .feature-card.amber-card::before {
+      background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
+    }
+
+    /* ── RADAR DEMO ── */
+    #demo {
+      padding: 80px;
+      background: linear-gradient(180deg, transparent, rgba(0, 212, 255, 0.02), transparent);
+    }
+
+    .demo-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .demo-radar-wrap {
+      position: relative;
+      display: flex;
+      justify-content: center;
+    }
+
+    .radar-container {
+      position: relative;
+      width: 420px;
+      height: 420px;
+    }
+
+    .radar-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 255, 136, 0.15);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .radar-ring:nth-child(1) {
+      width: 420px;
+      height: 420px;
+    }
+
+    .radar-ring:nth-child(2) {
+      width: 300px;
+      height: 300px;
+      border-color: rgba(0, 255, 136, 0.1);
+    }
+
+    .radar-ring:nth-child(3) {
+      width: 180px;
+      height: 180px;
+      border-color: rgba(0, 255, 136, 0.12);
+    }
+
+    .radar-ring:nth-child(4) {
+      width: 60px;
+      height: 60px;
+      border-color: rgba(0, 255, 136, 0.2);
+    }
+
+    .radar-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(0, 255, 136, 0.1);
+    }
+
+    .radar-crosshair.vertical {
+      width: 1px;
+      height: 100%;
+      top: 0;
+      left: 50%;
+      right: auto;
+      background: rgba(0, 255, 136, 0.1);
+    }
+
+    .radar-sweep {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 210px;
+      height: 2px;
+      transform-origin: left center;
+      background: linear-gradient(90deg, rgba(0, 255, 136, 0.8), transparent);
+      animation: radar-spin 3s linear infinite;
+    }
+
+    .radar-sweep::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: inherit;
+      filter: blur(3px);
+      transform: translateY(-50%);
+    }
+
+    @keyframes radar-spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .radar-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 270deg, rgba(0, 255, 136, 0.08) 360deg);
+      animation: radar-spin 3s linear infinite;
+    }
+
+    .radar-blip-dot {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: blip-appear 3s ease-in-out infinite;
+    }
+
+    @keyframes blip-appear {
+
+      0%,
+      100% {
+        opacity: 0.3
+      }
+
+      50% {
+        opacity: 1
+      }
+    }
+
+    .radar-label {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--green);
+      letter-spacing: 0.15em;
+    }
+
+    /* Demo right panel */
+    .demo-text {}
+
+    .demo-text .section-label {
+      margin-bottom: 8px;
+    }
+
+    .demo-text .section-title {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+
+    .demo-text p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      margin-bottom: 32px;
+    }
+
+    .terminal-block {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(0, 212, 255, 0.15);
+      padding: 20px 24px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.8;
+    }
+
+    .terminal-line {
+      color: var(--text-muted);
+    }
+
+    .terminal-line.cyan {
+      color: var(--cyan);
+    }
+
+    .terminal-line.green {
+      color: var(--green);
+    }
+
+    .terminal-line.amber {
+      color: var(--amber);
+    }
+
+    .terminal-line.red {
+      color: var(--red);
+    }
+
+    .terminal-line .prompt {
+      color: var(--text-muted);
+      margin-right: 8px;
+    }
+
+    .cursor-blink {
+      display: inline-block;
+      width: 7px;
+      height: 13px;
+      background: var(--cyan);
+      vertical-align: middle;
+      animation: cursor-blink 1s step-end infinite;
+    }
+
+    @keyframes cursor-blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* ── FOOTER CTA ── */
+    #cta {
+      padding: 140px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #cta::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta-stamp {
+      display: inline-block;
+      border: 3px solid rgba(255, 0, 85, 0.4);
+      color: rgba(255, 0, 85, 0.5);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.4em;
+      padding: 6px 24px;
+      transform: rotate(-2deg);
+      margin-bottom: 32px;
+    }
+
+    .cta-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 7vw, 7rem);
+      line-height: 0.92;
+      letter-spacing: 0.04em;
+      margin-bottom: 24px;
+    }
+
+    .cta-title .line2 {
+      color: var(--cyan);
+    }
+
+    .cta-desc {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.14em;
+      margin-bottom: 48px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid rgba(0, 212, 255, 0.08);
+      padding: 28px 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-left {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+    }
+
+    .footer-coords {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    .footer-coords span {
+      color: var(--cyan-dim);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hero-content {
+        padding: 0 40px;
+      }
+
+      #features {
+        padding: 80px 40px;
+      }
+
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .demo-inner {
+        grid-template-columns: 1fr;
+      }
+
+      .demo-radar-wrap {
+        justify-content: flex-start;
+      }
+
+      footer {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      #cta {
+        padding: 80px 40px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      h1.hero-title {
+        font-size: 4.5rem;
+      }
+
+      .hero-stats {
+        gap: 24px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-header {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section-desc {
+        text-align: left;
+        max-width: 100%;
+      }
+
+      nav {
+        padding: 0 20px;
+      }
+
+      .nav-right {
+        gap: 16px;
+      }
+    }
+
+    /* Fade in animation */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      animation: fade-up 0.7s ease forwards;
+    }
+
+    @keyframes fade-up {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .delay-1 {
+      animation-delay: 0.15s;
+    }
+
+    .delay-2 {
+      animation-delay: 0.3s;
+    }
+
+    .delay-3 {
+      animation-delay: 0.45s;
+    }
+
+    .delay-4 {
+      animation-delay: 0.6s;
+    }
+
+    .delay-5 {
+      animation-delay: 0.75s;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">NAVCOM <span>// FLEET OPS</span></div>
+    <div class="nav-right">
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#demo" class="nav-link">System</a>
+      <a href="#cta" class="nav-link">Access</a>
+      <div class="nav-status">
+        <div class="nav-status-dot"></div>
+        SYSTEM LIVE
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-lines"></div>
+    <div class="hero-radar-bg"></div>
+
+    <!-- Scattered ship blips -->
+    <div class="ship-blip cyan" style="top:22%; left:62%"></div>
+    <div class="ship-blip green" style="top:38%; left:72%"></div>
+    <div class="ship-blip amber" style="top:55%; left:66%"></div>
+    <div class="ship-blip red" style="top:44%; left:80%"></div>
+    <div class="ship-blip cyan" style="top:62%; left:75%"></div>
+    <div class="ship-blip green" style="top:30%; left:77%"></div>
+    <div class="ship-blip cyan" style="top:70%; left:58%"></div>
+
+    <div class="hero-content">
+      <div class="hero-eyebrow fade-up">
+        <div class="hero-eyebrow-line"></div>
+        <div class="hero-eyebrow-text">⚡ STRAIT OF HORMUZ CRISIS</div>
+        <div class="hero-eyebrow-badge">OPERATION ACTIVE</div>
+      </div>
+
+      <h1 class="hero-title fade-up delay-1">
+        FLEET<br>
+        <span class="cyan">COMMAND</span><br>
+        <span class="dim">OPS</span>
+      </h1>
+
+      <p class="hero-subtitle fade-up delay-2">
+        Real-time naval intelligence.<br>
+        <strong>AI-powered</strong> threat analysis, A* optimal routing,<br>
+        and live proximity alerts — for 15 vessels.
+      </p>
+
+      <div class="hero-cta-row fade-up delay-3">
+        <a href="./app.html" class="btn-primary">◆ LAUNCH OPS CENTRE</a>
+        <a href="#features" class="btn-secondary">
+          ▶ VIEW CAPABILITIES
+        </a>
+      </div>
+
+      <div class="hero-stats fade-up delay-4">
+        <div class="hero-stat">
+          <div class="hero-stat-value">15</div>
+          <div class="hero-stat-label">Vessels Tracked</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">1HZ</div>
+          <div class="hero-stat-label">Update Rate</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">A*</div>
+          <div class="hero-stat-label">Routing Algorithm</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">2KM</div>
+          <div class="hero-stat-label">Collision Threshold</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERT TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker-label">⚡ ALERTS</div>
+    <div class="ticker-track">
+      <span class="ticker-item">PROXIMITY — Gharial & Lotus within 1.64km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">WEATHER_WARNING — Kite entering heavy weather corridor — <span>Beaufort 7</span></span>
+      <span class="ticker-item">PROXIMITY — Iris & Mirage within 1.56km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">PROXIMITY — Aurora & Orca within 1.69km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">WEATHER_WARNING — Jade entering heavy weather corridor — <span>Beaufort 7</span></span>
+      <span class="ticker-item">COMMS OFFLINE — Orca primary communications offline — <span>MV-15</span></span>
+      <span class="ticker-item">PROXIMITY — Halcyon & Mirage within 1.26km — <span>COLLISION RISK</span></span>
+      <!-- duplicate for seamless loop -->
+      <span class="ticker-item">PROXIMITY — Gharial & Lotus within 1.64km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">WEATHER_WARNING — Kite entering heavy weather corridor — <span>Beaufort 7</span></span>
+      <span class="ticker-item">PROXIMITY — Iris & Mirage within 1.56km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">PROXIMITY — Aurora & Orca within 1.69km — <span>COLLISION RISK</span></span>
+      <span class="ticker-item">WEATHER_WARNING — Jade entering heavy weather corridor — <span>Beaufort 7</span></span>
+      <span class="ticker-item">COMMS OFFLINE — Orca primary communications offline — <span>MV-15</span></span>
+      <span class="ticker-item">PROXIMITY — Halcyon & Mirage within 1.26km — <span>COLLISION RISK</span></span>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="section-header">
+      <div>
+        <div class="section-label">// SYSTEM CAPABILITIES</div>
+        <div class="section-title">TACTICAL<br><span class="accent">INTELLIGENCE</span></div>
+      </div>
+      <div class="section-desc">
+        A full-spectrum maritime command platform built for high-stakes geopolitical operations.
+      </div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-num">01</div>
+        <div class="feature-icon">◈</div>
+        <div class="feature-title">Live Fleet Registry</div>
+        <div class="feature-desc">15 vessels tracked at 1Hz. Real-time position, speed, heading, and fuel status for
+          every ship in the operational zone.</div>
+        <div class="feature-tag">REAL-TIME · AIS DATA</div>
+      </div>
+
+      <div class="feature-card alert">
+        <div class="feature-num">02</div>
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">Proximity Alerts</div>
+        <div class="feature-desc">Automatic collision risk detection when vessels close within 2km. Instant alert feed
+          with vessel IDs and closure rates.</div>
+        <div class="feature-tag">AUTO-DETECT · 2KM THRESHOLD</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">03</div>
+        <div class="feature-icon">◉</div>
+        <div class="feature-title">Tactical Radar</div>
+        <div class="feature-desc">250NM tactical radar overlay with live sweep, vessel blips, and sector classification
+          for situational awareness.</div>
+        <div class="feature-tag">250NM · LIVE SWEEP</div>
+      </div>
+
+      <div class="feature-card amber-card">
+        <div class="feature-num">04</div>
+        <div class="feature-icon">◆</div>
+        <div class="feature-title">AI Command Briefing</div>
+        <div class="feature-desc">Natural language AI briefings on fleet status. Ask the system anything — vessel
+          states, threat levels, routing options.</div>
+        <div class="feature-tag">NLP · CLAUDE AI</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">05</div>
+        <div class="feature-icon">▲</div>
+        <div class="feature-title">A* Optimal Routing</div>
+        <div class="feature-desc">Pathfinding algorithm computes optimal routes through restricted zones, avoiding
+          hazards and collision corridors in real-time.</div>
+        <div class="feature-tag">A* ALGORITHM · DYNAMIC</div>
+      </div>
+
+      <div class="feature-card alert">
+        <div class="feature-num">06</div>
+        <div class="feature-icon">▣</div>
+        <div class="feature-title">Geofence Zones</div>
+        <div class="feature-desc">Draw custom exclusion and alert zones directly on the map. Instant breach detection
+          with severity classification.</div>
+        <div class="feature-tag">CUSTOM ZONES · DRAW MODE</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">07</div>
+        <div class="feature-icon">⬡</div>
+        <div class="feature-title">Timeline Playback</div>
+        <div class="feature-desc">Full mission timeline with T+0 replay capability. Scrub through historical positions
+          and incident reconstructions.</div>
+        <div class="feature-tag">REPLAY · T+0 ORIGIN</div>
+      </div>
+
+      <div class="feature-card amber-card">
+        <div class="feature-num">08</div>
+        <div class="feature-icon">✦</div>
+        <div class="feature-title">Captain Role System</div>
+        <div class="feature-desc">Role-based access with Captain override authority. Multi-user command hierarchy with
+          authenticated command logging.</div>
+        <div class="feature-tag">RBAC · COMMAND AUTH</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">09</div>
+        <div class="feature-icon">◐</div>
+        <div class="feature-title">Weather Corridor Intel</div>
+        <div class="feature-desc">Beaufort scale weather warnings integrated into routing decisions. Storm corridor
+          avoidance for all active vessels.</div>
+        <div class="feature-tag">BEAUFORT · LIVE WEATHER</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RADAR DEMO -->
+  <section id="demo">
+    <div class="demo-inner">
+      <div class="demo-radar-wrap">
+        <div class="radar-container">
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-crosshair"></div>
+          <div class="radar-crosshair vertical"></div>
+          <div class="radar-glow"></div>
+          <div class="radar-sweep"></div>
+          <div class="radar-label">TACTICAL RADAR · 250NM</div>
+
+          <!-- blips -->
+          <div class="radar-blip-dot" style="top:30%; left:58%"></div>
+          <div class="radar-blip-dot" style="top:55%; left:42%; animation-delay:1s"></div>
+          <div class="radar-blip-dot" style="top:44%; left:63%; animation-delay:0.5s"></div>
+          <div class="radar-blip-dot" style="top:68%; left:52%; animation-delay:1.5s"></div>
+          <div class="radar-blip-dot" style="top:38%; left:46%; animation-delay:0.8s"></div>
+          <div class="radar-blip-dot" style="top:25%; left:48%; animation-delay:2s" style="background:var(--amber)">
+          </div>
+          <div class="radar-blip-dot" style="top:60%; left:60%; background:var(--red); animation-delay:0.3s"></div>
+        </div>
+      </div>
+
+      <div class="demo-text">
+        <div class="section-label">// AI COMMAND INTERFACE</div>
+        <div class="section-title">REAL-TIME<br><span class="accent">INTEL</span></div>
+        <p>The AI CMD terminal lets operators query the entire fleet in plain English. Instant briefings, rerouting
+          commands, and threat assessments — delivered in seconds.</p>
+
+        <div class="terminal-block">
+          <div class="terminal-line"><span class="prompt">◆ AI CMD &gt;</span> <span class="cyan">What's the fleet
+              status?</span></div>
+          <div class="terminal-line"> </div>
+          <div class="terminal-line green">NAVCOM BRIEF // T+36M</div>
+          <div class="terminal-line"> </div>
+          <div class="terminal-line">Vessels nominal: <span class="cyan" style="color:var(--cyan)">13</span></div>
+          <div class="terminal-line">Alert status: <span style="color:var(--red)">2 PROXIMITY RISKS</span></div>
+          <div class="terminal-line">Weather: <span style="color:var(--amber)">Beaufort 7 corridor active</span></div>
+          <div class="terminal-line">Recommended: <span class="cyan" style="color:var(--cyan)">Reroute Kite via NW
+              passage</span></div>
+          <div class="terminal-line"> </div>
+          <div class="terminal-line"><span class="prompt">◆ AI CMD &gt;</span> <span class="cursor-blink"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="cta">
+    <div class="cta-stamp">CLASSIFIED ACTIVE</div>
+    <div class="cta-title">
+      ENTER THE<br>
+      <span class="line2">COMMAND CENTRE</span>
+    </div>
+    <div class="cta-desc">Operational intelligence for 15 vessels — live, right now.</div>
+    <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
+      <a href="./app.html" class="btn-primary">◆ LAUNCH OPS CENTRE</a>
+      <a href="#features" class="btn-secondary">
+        ▶ CAPABILITIES
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-left">NAVCOM // FLEET OPS &nbsp;·&nbsp; AI COMMAND PLATFORM &nbsp;·&nbsp; HACKATHON BUILD 2025
+    </div>
+    <div class="footer-coords">
+      <span>24.3452°N</span> &nbsp;<span>54.6460°E</span> &nbsp;·&nbsp; STRAIT OF HORMUZ
+    </div>
+  </footer>
+
+</body>
+
 </html>
