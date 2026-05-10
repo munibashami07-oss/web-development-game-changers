@@ -79,6 +79,21 @@ function haversineKM(a: [number, number], b: [number, number]) {
 function replanShip(ship: ShipState): boolean {
     const dest = PORTS[ship.destination];
     if (!dest) return false;
+
+    // If ship is currently on land, nudge it to the nearest water before pathing.
+    // Without this, A* fails because the start point itself isn't navigable.
+    const { isNavigable } = require("./routing");
+    if (!isNavigable(ship.position)) {
+        const rescued = nudgeToWater(ship.position);
+        if (rescued) {
+            ship.position = rescued;
+            addAlert({
+                type: "REROUTE", shipId: ship.shipId, severity: "low",
+                message: `${ship.name} repositioned to navigable water.`,
+            });
+        }
+    }
+
     const path = findPath(ship.position, dest, getZones());
     if (!path || path.length < 2) {
         ship.status = "stranded";
@@ -95,6 +110,21 @@ function replanShip(ship: ShipState): boolean {
     const fuelNeeded = burnRate * timeHr * (ship.weatherPenalty ? 1.3 : 1);
     ship.insufficientFuel = fuelNeeded > ship.fuel;
     return true;
+}
+
+/** Search outward in expanding rings until we find a navigable water point.
+ *  Returns null if no water within 2 degrees. */
+function nudgeToWater(pos: [number, number]): [number, number] | null {
+    const { isNavigable } = require("./routing");
+    for (let r = 0.1; r <= 2.0; r += 0.1) {
+        for (let angle = 0; angle < 360; angle += 30) {
+            const dy = r * Math.cos(toRadians(angle));
+            const dx = r * Math.sin(toRadians(angle));
+            const candidate: [number, number] = [pos[0] + dy, pos[1] + dx];
+            if (isNavigable(candidate)) return candidate;
+        }
+    }
+    return null;
 }
 
 function moveShip(ship: ShipState, seconds: number) {
