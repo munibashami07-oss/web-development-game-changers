@@ -2,1390 +2,795 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NAVCOM // FLEET OPS — Command Intelligence Platform</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fleet Command</title>
   <link
-    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap"
-    rel="stylesheet">
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@200;400;700&family=Barlow:wght@300;400&display=swap"
+    rel="stylesheet" />
   <style>
-    :root {
-      --bg-primary: #05080f;
-      --bg-secondary: #0a0e1a;
-      --bg-panel: rgba(10, 18, 35, 0.92);
-      --bg-panel-border: rgba(0, 212, 255, 0.15);
-      --cyan: #00d4ff;
-      --cyan-bright: #00ffee;
-      --cyan-dim: rgba(0, 212, 255, 0.4);
-      --green: #00ff88;
-      --green-dim: rgba(0, 255, 136, 0.5);
-      --red: #ff0055;
-      --red-dim: rgba(255, 0, 85, 0.6);
-      --amber: #ffaa00;
-      --amber-dim: rgba(255, 170, 0, 0.5);
-      --text-primary: #e8f4ff;
-      --text-secondary: #7a9bb5;
-      --text-muted: #3a5570;
-    }
-
-    * {
+    *,
+    *::before,
+    *::after {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
-    html {
-      scroll-behavior: smooth;
-    }
-
+    html,
     body {
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-family: 'Rajdhani', sans-serif;
-      overflow-x: hidden;
-      cursor: crosshair;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #05080f;
+      font-family: 'Barlow', sans-serif;
+      color: #e8f4ff;
     }
 
-    /* ── SCANLINE OVERLAY ── */
-    body::before {
-      content: '';
+    #cur {
       position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(0deg,
-          transparent,
-          transparent 2px,
-          rgba(0, 0, 0, 0.08) 2px,
-          rgba(0, 0, 0, 0.08) 4px);
+      width: 8px;
+      height: 8px;
+      background: #00d4ff;
+      border-radius: 50%;
       pointer-events: none;
       z-index: 9999;
+      transform: translate(-50%, -50%);
     }
 
-    /* ── NOISE GRAIN ── */
-    body::after {
-      content: '';
+    #curR {
       position: fixed;
-      inset: -50%;
-      width: 200%;
-      height: 200%;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      width: 32px;
+      height: 32px;
+      border: 1px solid rgba(0, 212, 255, .55);
+      border-radius: 50%;
       pointer-events: none;
       z-index: 9998;
-      opacity: 0.4;
+      transform: translate(-50%, -50%);
+      transition: left .1s ease-out, top .1s ease-out;
     }
 
-    /* ── TOP NAV ── */
-    nav {
+    #video-phase {
       position: fixed;
-      top: 0;
+      inset: 0;
+      z-index: 100;
+      background: #000;
+      transition: opacity 1.8s ease;
+    }
+
+    #video-phase.out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #hero-video {
       width: 100%;
-      z-index: 1000;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+      display: block;
+    }
+
+    .bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      background: #000;
+      z-index: 2;
+      transition: height 1.1s cubic-bezier(.76, 0, .24, 1);
+    }
+
+    .bar.top {
+      top: 0;
+      height: 9vh;
+    }
+
+    .bar.bot {
+      bottom: 0;
+      height: 9vh;
+    }
+
+    .bar.open {
+      height: 0;
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(ellipse 75% 75% at 50% 50%, transparent 20%, rgba(0, 0, 0, .72) 100%);
+    }
+
+    .vid-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      animation: fadeIn 1.3s ease forwards 0.9s;
+    }
+
+    .vid-overlay h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(4.5rem, 13vw, 10rem);
+      letter-spacing: .06em;
+      line-height: .88;
+      background: linear-gradient(150deg, #fff 15%, #00d4ff 85%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .vid-overlay p {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 200;
+      font-size: .82rem;
+      letter-spacing: .45em;
+      text-transform: uppercase;
+      color: rgba(0, 212, 255, .75);
+      margin-top: 1.4rem;
+    }
+
+    #skip-btn {
+      position: absolute;
+      bottom: 2.8rem;
+      right: 2.8rem;
+      z-index: 10;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .75rem;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: rgba(0, 212, 255, .6);
+      background: transparent;
+      border: 1px solid rgba(0, 212, 255, .22);
+      padding: .6rem 1.5rem;
+      cursor: none;
+      transition: color .3s, border-color .3s;
+      opacity: 0;
+      animation: fadeIn .8s ease forwards 2.2s;
+    }
+
+    #skip-btn:hover {
+      color: #00d4ff;
+      border-color: rgba(0, 212, 255, .55);
+    }
+
+    #map-phase {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.8s ease;
+    }
+
+    #map-phase.in {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .hud-nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 40px;
-      height: 52px;
-      background: rgba(5, 8, 15, 0.95);
-      border-bottom: 1px solid var(--bg-panel-border);
+      padding: .85rem 2.2rem;
+      border-bottom: 1px solid rgba(0, 212, 255, .13);
+      background: rgba(5, 8, 15, .92);
       backdrop-filter: blur(12px);
+      flex-shrink: 0;
+      z-index: 10;
     }
 
     .nav-logo {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.4rem;
-      letter-spacing: 0.12em;
-      color: var(--text-primary);
+      font-size: 1.55rem;
+      letter-spacing: .12em;
+      color: #00d4ff;
     }
 
-    .nav-logo span {
-      color: var(--cyan);
-      margin-left: 6px;
-      font-size: 0.85rem;
-      letter-spacing: 0.2em;
-      vertical-align: middle;
-    }
-
-    .nav-right {
+    .nav-links {
       display: flex;
+      gap: 2rem;
+      list-style: none;
       align-items: center;
-      gap: 32px;
-    }
-
-    .nav-link {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 0.15em;
-      color: var(--text-secondary);
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: color 0.2s;
-    }
-
-    .nav-link:hover {
-      color: var(--cyan);
     }
 
     .nav-status {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .72rem;
+      letter-spacing: .2em;
+      color: rgba(0, 212, 255, .55);
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--green);
-      letter-spacing: 0.1em;
+      gap: .55rem;
     }
 
-    .nav-status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: pulse-green 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse-green {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.5);
-      }
-
-      50% {
-        box-shadow: 0 0 0 5px rgba(0, 255, 136, 0);
-      }
-    }
-
-    /* ── HERO ── */
-    #hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      overflow: hidden;
-      padding: 52px 0 0;
-    }
-
-    /* Background grid */
-    .hero-grid {
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
-    }
-
-    /* Glowing diagonal accent lines */
-    .hero-lines {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .hero-lines::before {
-      content: '';
-      position: absolute;
-      top: 15%;
-      left: -10%;
-      width: 140%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--cyan-dim), transparent);
-      transform: rotate(-12deg);
-      animation: scan-line 6s linear infinite;
-    }
-
-    .hero-lines::after {
-      content: '';
-      position: absolute;
-      top: 35%;
-      left: -10%;
-      width: 140%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.3), transparent);
-      transform: rotate(-12deg);
-      animation: scan-line 6s linear infinite 2s;
-    }
-
-    @keyframes scan-line {
-      0% {
-        opacity: 0;
-        transform: rotate(-12deg) translateX(-20%);
-      }
-
-      20% {
-        opacity: 1;
-      }
-
-      80% {
-        opacity: 1;
-      }
-
-      100% {
-        opacity: 0;
-        transform: rotate(-12deg) translateX(20%);
-      }
-    }
-
-    /* Large radar circle bg */
-    .hero-radar-bg {
-      position: absolute;
-      right: -200px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 800px;
-      height: 800px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 212, 255, 0.08);
-      box-shadow:
-        inset 0 0 200px rgba(0, 212, 255, 0.04),
-        0 0 200px rgba(0, 212, 255, 0.04);
-    }
-
-    .hero-radar-bg::before {
-      content: '';
-      position: absolute;
-      inset: 80px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 212, 255, 0.06);
-    }
-
-    .hero-radar-bg::after {
-      content: '';
-      position: absolute;
-      inset: 200px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 212, 255, 0.05);
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 10;
-      padding: 0 80px;
-      max-width: 1400px;
-    }
-
-    .hero-eyebrow {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    .hero-eyebrow-line {
-      width: 40px;
-      height: 1px;
-      background: var(--red);
-    }
-
-    .hero-eyebrow-text {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.72rem;
-      letter-spacing: 0.25em;
-      color: var(--red);
-      text-transform: uppercase;
-      animation: blink-red 2s step-end infinite;
-    }
-
-    @keyframes blink-red {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: 0.4
-      }
-    }
-
-    .hero-eyebrow-badge {
-      margin-left: 8px;
-      padding: 2px 8px;
-      background: rgba(255, 0, 85, 0.15);
-      border: 1px solid rgba(255, 0, 85, 0.4);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--red);
-      letter-spacing: 0.1em;
-    }
-
-    h1.hero-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(5rem, 12vw, 13rem);
-      line-height: 0.88;
-      letter-spacing: 0.02em;
-      color: var(--text-primary);
-      margin-bottom: 8px;
-    }
-
-    h1.hero-title .cyan {
-      color: var(--cyan);
-    }
-
-    h1.hero-title .dim {
-      color: var(--text-muted);
-    }
-
-    .hero-subtitle {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.82rem;
-      letter-spacing: 0.18em;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      margin: 24px 0 48px;
-      max-width: 540px;
-      line-height: 1.7;
-    }
-
-    .hero-subtitle strong {
-      color: var(--cyan-bright);
-      font-weight: 400;
-    }
-
-    .hero-cta-row {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 36px;
-      background: var(--cyan);
-      color: var(--bg-primary);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      text-decoration: none;
-      font-weight: 700;
-      border: none;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.2s;
-      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    }
-
-    .btn-primary::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: white;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .btn-primary:hover::before {
-      opacity: 0.15;
-    }
-
-    .btn-primary:hover {
-      box-shadow: 0 0 40px rgba(0, 212, 255, 0.5);
-    }
-
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 13px 32px;
-      background: transparent;
-      color: var(--text-secondary);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      text-decoration: none;
-      border: 1px solid var(--text-muted);
-      cursor: pointer;
-      transition: all 0.25s;
-      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--cyan-dim);
-      color: var(--cyan);
-    }
-
-    /* Stats strip */
-    .hero-stats {
-      display: flex;
-      gap: 48px;
-      margin-top: 64px;
-      padding-top: 32px;
-      border-top: 1px solid rgba(0, 212, 255, 0.1);
-    }
-
-    .hero-stat {}
-
-    .hero-stat-value {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 2.8rem;
-      color: var(--cyan);
-      line-height: 1;
-      letter-spacing: 0.05em;
-    }
-
-    .hero-stat-label {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.62rem;
-      color: var(--text-muted);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-top: 4px;
-    }
-
-    /* Live ship blips */
-    .ship-blip {
-      position: absolute;
+    .dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      animation: blip-pulse 2.5s ease-in-out infinite;
+      background: #00ff88;
+      animation: blink 2s ease-in-out infinite;
     }
 
-    .ship-blip.cyan {
-      background: var(--cyan);
-      animation-delay: 0s;
-    }
-
-    .ship-blip.green {
-      background: var(--green);
-      animation-delay: 0.6s;
-    }
-
-    .ship-blip.amber {
-      background: var(--amber);
-      animation-delay: 1.2s;
-    }
-
-    .ship-blip.red {
-      background: var(--red);
-      animation-delay: 0.3s;
-    }
-
-    @keyframes blip-pulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 currentColor;
-        opacity: 0.9;
-      }
-
-      50% {
-        box-shadow: 0 0 0 8px transparent;
-        opacity: 1;
-      }
-    }
-
-    /* ── ALERT TICKER ── */
-    .ticker-wrap {
-      background: rgba(255, 0, 85, 0.08);
-      border-top: 1px solid rgba(255, 0, 85, 0.25);
-      border-bottom: 1px solid rgba(255, 0, 85, 0.25);
-      padding: 10px 0;
-      overflow: hidden;
-      white-space: nowrap;
-      position: relative;
-    }
-
-    .ticker-label {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      padding: 0 20px;
-      background: var(--red);
-      color: var(--bg-primary);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.68rem;
-      letter-spacing: 0.15em;
-      display: flex;
-      align-items: center;
-      z-index: 2;
-      font-weight: 700;
-    }
-
-    .ticker-track {
-      display: inline-block;
-      animation: ticker-scroll 28s linear infinite;
-      padding-left: 120px;
-    }
-
-    .ticker-item {
-      display: inline-block;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.68rem;
-      color: var(--red);
-      letter-spacing: 0.1em;
-      margin-right: 60px;
-    }
-
-    .ticker-item span {
-      color: var(--amber);
-    }
-
-    @keyframes ticker-scroll {
-      0% {
-        transform: translateX(0);
-      }
-
-      100% {
-        transform: translateX(-50%);
-      }
-    }
-
-    /* ── FEATURES SECTION ── */
-    #features {
-      padding: 120px 80px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      margin-bottom: 64px;
-    }
-
-    .section-label {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.68rem;
-      color: var(--cyan-dim);
-      letter-spacing: 0.2em;
+    .launch-btn {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .72rem;
+      letter-spacing: .28em;
       text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    .section-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(2.5rem, 5vw, 4.5rem);
-      letter-spacing: 0.05em;
-      line-height: 0.95;
-      color: var(--text-primary);
-    }
-
-    .section-title .accent {
-      color: var(--cyan);
-    }
-
-    .section-desc {
-      max-width: 320px;
-      font-size: 0.88rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-      text-align: right;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2px;
-    }
-
-    .feature-card {
-      position: relative;
-      padding: 40px 36px;
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      overflow: hidden;
-      transition: all 0.3s;
-      cursor: default;
-    }
-
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--cyan-dim), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-
-    .feature-card:hover {
-      background: rgba(10, 25, 50, 0.95);
-      border-color: var(--cyan-dim);
-    }
-
-    .feature-num {
-      position: absolute;
-      top: 20px;
-      right: 24px;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 5rem;
-      color: rgba(0, 212, 255, 0.06);
-      line-height: 1;
-      pointer-events: none;
-      transition: color 0.3s;
-    }
-
-    .feature-card:hover .feature-num {
-      color: rgba(0, 212, 255, 0.1);
-    }
-
-    .feature-icon {
-      width: 40px;
-      height: 40px;
-      border: 1px solid var(--cyan-dim);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 24px;
-      color: var(--cyan);
-      font-size: 1.1rem;
-      transition: all 0.3s;
+      color: #05080f;
+      background: #00d4ff;
+      border: none;
+      padding: .55rem 1.6rem;
+      text-decoration: none;
+      cursor: none;
+      transition: background .2s, transform .15s, box-shadow .2s;
+      display: inline-block;
       clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
     }
 
-    .feature-card:hover .feature-icon {
-      background: rgba(0, 212, 255, 0.1);
+    .launch-btn:hover {
+      background: #00ffee;
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(0, 212, 255, .4);
     }
 
-    .feature-title {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 1.05rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 10px;
-    }
-
-    .feature-desc {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      line-height: 1.55;
-    }
-
-    .feature-tag {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 3px 10px;
-      background: rgba(0, 212, 255, 0.08);
-      border: 1px solid rgba(0, 212, 255, 0.2);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.6rem;
-      color: var(--cyan-dim);
-      letter-spacing: 0.12em;
-    }
-
-    /* special cards */
-    .feature-card.alert {
-      border-color: rgba(255, 0, 85, 0.2);
-    }
-
-    .feature-card.alert .feature-icon {
-      border-color: rgba(255, 0, 85, 0.4);
-      color: var(--red);
-    }
-
-    .feature-card.alert::before {
-      background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.3), transparent);
-    }
-
-    .feature-card.amber-card {
-      border-color: rgba(255, 170, 0, 0.2);
-    }
-
-    .feature-card.amber-card .feature-icon {
-      border-color: rgba(255, 170, 0, 0.4);
-      color: var(--amber);
-    }
-
-    .feature-card.amber-card::before {
-      background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
-    }
-
-    /* ── RADAR DEMO ── */
-    #demo {
-      padding: 80px;
-      background: linear-gradient(180deg, transparent, rgba(0, 212, 255, 0.02), transparent);
-    }
-
-    .demo-inner {
-      max-width: 1400px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1fr 480px;
-      gap: 60px;
-      align-items: center;
-    }
-
-    .demo-radar-wrap {
-      position: relative;
-      display: flex;
-      justify-content: center;
-    }
-
-    .radar-container {
-      position: relative;
-      width: 420px;
-      height: 420px;
-    }
-
-    .radar-ring {
-      position: absolute;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 255, 136, 0.15);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .radar-ring:nth-child(1) {
-      width: 420px;
-      height: 420px;
-    }
-
-    .radar-ring:nth-child(2) {
-      width: 300px;
-      height: 300px;
-      border-color: rgba(0, 255, 136, 0.1);
-    }
-
-    .radar-ring:nth-child(3) {
-      width: 180px;
-      height: 180px;
-      border-color: rgba(0, 255, 136, 0.12);
-    }
-
-    .radar-ring:nth-child(4) {
-      width: 60px;
-      height: 60px;
-      border-color: rgba(0, 255, 136, 0.2);
-    }
-
-    .radar-crosshair {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: rgba(0, 255, 136, 0.1);
-    }
-
-    .radar-crosshair.vertical {
-      width: 1px;
-      height: 100%;
-      top: 0;
-      left: 50%;
-      right: auto;
-      background: rgba(0, 255, 136, 0.1);
-    }
-
-    .radar-sweep {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 210px;
-      height: 2px;
-      transform-origin: left center;
-      background: linear-gradient(90deg, rgba(0, 255, 136, 0.8), transparent);
-      animation: radar-spin 3s linear infinite;
-    }
-
-    .radar-sweep::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: inherit;
-      filter: blur(3px);
-      transform: translateY(-50%);
-    }
-
-    @keyframes radar-spin {
-      from {
-        transform: rotate(0deg);
-      }
-
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    .radar-glow {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: conic-gradient(from 0deg, transparent 270deg, rgba(0, 255, 136, 0.08) 360deg);
-      animation: radar-spin 3s linear infinite;
-    }
-
-    .radar-blip-dot {
-      position: absolute;
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      animation: blip-appear 3s ease-in-out infinite;
-    }
-
-    @keyframes blip-appear {
-
-      0%,
-      100% {
-        opacity: 0.3
-      }
-
-      50% {
-        opacity: 1
-      }
-    }
-
-    .radar-label {
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.62rem;
-      color: var(--green);
-      letter-spacing: 0.15em;
-    }
-
-    /* Demo right panel */
-    .demo-text {}
-
-    .demo-text .section-label {
-      margin-bottom: 8px;
-    }
-
-    .demo-text .section-title {
-      font-size: 3rem;
-      margin-bottom: 20px;
-    }
-
-    .demo-text p {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
-      margin-bottom: 32px;
-    }
-
-    .terminal-block {
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(0, 212, 255, 0.15);
-      padding: 20px 24px;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.72rem;
-      line-height: 1.8;
-    }
-
-    .terminal-line {
-      color: var(--text-muted);
-    }
-
-    .terminal-line.cyan {
-      color: var(--cyan);
-    }
-
-    .terminal-line.green {
-      color: var(--green);
-    }
-
-    .terminal-line.amber {
-      color: var(--amber);
-    }
-
-    .terminal-line.red {
-      color: var(--red);
-    }
-
-    .terminal-line .prompt {
-      color: var(--text-muted);
-      margin-right: 8px;
-    }
-
-    .cursor-blink {
-      display: inline-block;
-      width: 7px;
-      height: 13px;
-      background: var(--cyan);
-      vertical-align: middle;
-      animation: cursor-blink 1s step-end infinite;
-    }
-
-    @keyframes cursor-blink {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: 0
-      }
-    }
-
-    /* ── FOOTER CTA ── */
-    #cta {
-      padding: 140px 80px;
-      text-align: center;
+    .map-wrap {
+      flex: 1;
       position: relative;
       overflow: hidden;
     }
 
-    #cta::before {
+    #mapCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #mapSvg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .map-wrap::before {
       content: '';
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(0, 212, 255, 0.05) 0%, transparent 70%);
+      inset: 0;
+      z-index: 5;
       pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.06) 2px, rgba(0, 0, 0, 0.06) 4px);
     }
 
-    .cta-stamp {
-      display: inline-block;
-      border: 3px solid rgba(255, 0, 85, 0.4);
-      color: rgba(255, 0, 85, 0.5);
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.1rem;
-      letter-spacing: 0.4em;
-      padding: 6px 24px;
-      transform: rotate(-2deg);
-      margin-bottom: 32px;
+    #tip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 20;
+      background: rgba(5, 8, 15, .95);
+      border: 1px solid rgba(0, 212, 255, .28);
+      padding: .7rem 1rem;
+      min-width: 175px;
+      font-family: 'Barlow Condensed', sans-serif;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transition: opacity .18s;
     }
 
-    .cta-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(3rem, 7vw, 7rem);
-      line-height: 0.92;
-      letter-spacing: 0.04em;
-      margin-bottom: 24px;
+    #tip.show {
+      opacity: 1;
     }
 
-    .cta-title .line2 {
-      color: var(--cyan);
+    .tt-n {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: #00d4ff;
+      margin-bottom: .3rem;
     }
 
-    .cta-desc {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-      letter-spacing: 0.14em;
-      margin-bottom: 48px;
+    .tt-r {
+      font-size: .72rem;
+      letter-spacing: .14em;
+      color: rgba(232, 244, 255, .55);
+      margin: .18rem 0;
     }
 
-    /* ── FOOTER ── */
-    footer {
-      border-top: 1px solid rgba(0, 212, 255, 0.08);
-      padding: 28px 80px;
+    .tt-r span {
+      color: #e8f4ff;
+    }
+
+    #panel {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 275px;
+      background: rgba(5, 8, 15, .95);
+      border-left: 1px solid rgba(0, 212, 255, .15);
+      backdrop-filter: blur(12px);
+      transform: translateX(100%);
+      transition: transform .5s cubic-bezier(.76, 0, .24, 1);
+      z-index: 15;
+      overflow-y: auto;
+      padding: 1.4rem 1.5rem;
+    }
+
+    #panel.open {
+      transform: translateX(0);
+    }
+
+    .p-close {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .7rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: rgba(0, 212, 255, .45);
+      background: none;
+      border: none;
+      cursor: none;
+      margin-bottom: 1.5rem;
       display: flex;
       align-items: center;
+      gap: .4rem;
+      padding: 0;
+    }
+
+    .p-close:hover {
+      color: #00d4ff;
+    }
+
+    .p-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.9rem;
+      letter-spacing: .07em;
+      line-height: 1;
+      margin-bottom: .25rem;
+      color: #e8f4ff;
+    }
+
+    .p-type {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .72rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: #00d4ff;
+      margin-bottom: 1.3rem;
+    }
+
+    .p-div {
+      width: 100%;
+      height: 1px;
+      background: rgba(0, 212, 255, .1);
+      margin: .9rem 0;
+    }
+
+    .p-row {
+      display: flex;
       justify-content: space-between;
+      align-items: center;
+      margin: .45rem 0;
     }
 
-    .footer-left {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--text-muted);
-      letter-spacing: 0.12em;
+    .p-key {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .68rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: rgba(232, 244, 255, .35);
     }
 
-    .footer-coords {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.62rem;
-      color: var(--text-muted);
-      letter-spacing: 0.1em;
+    .p-val {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .84rem;
+      letter-spacing: .1em;
     }
 
-    .footer-coords span {
-      color: var(--cyan-dim);
+    .p-val.g {
+      color: #00ff88;
     }
 
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .hero-content {
-        padding: 0 40px;
-      }
-
-      #features {
-        padding: 80px 40px;
-      }
-
-      .features-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .demo-inner {
-        grid-template-columns: 1fr;
-      }
-
-      .demo-radar-wrap {
-        justify-content: flex-start;
-      }
-
-      footer {
-        flex-direction: column;
-        gap: 12px;
-        text-align: center;
-      }
-
-      #cta {
-        padding: 80px 40px;
-      }
+    .p-val.a {
+      color: #00d4ff;
     }
 
-    @media (max-width: 640px) {
-      h1.hero-title {
-        font-size: 4.5rem;
-      }
-
-      .hero-stats {
-        gap: 24px;
-      }
-
-      .features-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .section-header {
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .section-desc {
-        text-align: left;
-        max-width: 100%;
-      }
-
-      nav {
-        padding: 0 20px;
-      }
-
-      .nav-right {
-        gap: 16px;
-      }
+    .p-val.r {
+      color: #ff0055;
     }
 
-    /* Fade in animation */
-    .fade-up {
+    .badge {
+      padding: .18rem .65rem;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .64rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      border-radius: 2px;
+    }
+
+    .badge.active {
+      background: rgba(0, 255, 136, .08);
+      color: #00ff88;
+      border: 1px solid rgba(0, 255, 136, .18);
+    }
+
+    .badge.patrol {
+      background: rgba(0, 212, 255, .08);
+      color: #00d4ff;
+      border: 1px solid rgba(0, 212, 255, .18);
+    }
+
+    .badge.hold {
+      background: rgba(255, 0, 85, .08);
+      color: #ff0055;
+      border: 1px solid rgba(255, 0, 85, .18);
+    }
+
+    #launch-cta {
+      position: absolute;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      text-align: center;
       opacity: 0;
-      transform: translateY(24px);
-      animation: fade-up 0.7s ease forwards;
+      animation: fadeIn 1s ease forwards 1s;
     }
 
-    @keyframes fade-up {
+    #launch-cta p {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .68rem;
+      letter-spacing: .3em;
+      text-transform: uppercase;
+      color: rgba(0, 212, 255, .5);
+      margin-bottom: .8rem;
+    }
+
+    #launch-cta a {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: #05080f;
+      background: #00d4ff;
+      padding: .8rem 3rem;
+      text-decoration: none;
+      cursor: none;
+      display: inline-block;
+      transition: background .2s, box-shadow .2s;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    #launch-cta a:hover {
+      background: #00ffee;
+      box-shadow: 0 0 40px rgba(0, 212, 255, .5);
+    }
+
+    .hud-bar {
+      display: flex;
+      border-top: 1px solid rgba(0, 212, 255, .12);
+      background: rgba(5, 8, 15, .95);
+      flex-shrink: 0;
+    }
+
+    .hud-cell {
+      flex: 1;
+      padding: .75rem 1.2rem;
+      border-right: 1px solid rgba(0, 212, 255, .08);
+      display: flex;
+      flex-direction: column;
+      gap: .2rem;
+    }
+
+    .hud-cell:last-child {
+      border-right: none;
+    }
+
+    .hud-lbl {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: .6rem;
+      letter-spacing: .3em;
+      text-transform: uppercase;
+      color: rgba(0, 212, 255, .45);
+    }
+
+    .hud-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.25rem;
+      letter-spacing: .07em;
+      color: #e8f4ff;
+    }
+
+    .hud-val.g {
+      color: #00ff88;
+    }
+
+    .hud-val.a {
+      color: #00d4ff;
+    }
+
+    .hud-val.r {
+      color: #ff0055;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    @keyframes dashMove {
+      to {
+        stroke-dashoffset: -60;
+      }
+    }
+
+    @keyframes radarOut {
+      0% {
+        r: 0;
+        stroke-opacity: .7
+      }
+
+      100% {
+        r: 30;
+        stroke-opacity: 0
+      }
+    }
+
+    @keyframes hudSlide {
+      from {
+        opacity: 0;
+        transform: translateY(16px)
+      }
+
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0)
       }
     }
 
-    .delay-1 {
-      animation-delay: 0.15s;
-    }
-
-    .delay-2 {
-      animation-delay: 0.3s;
-    }
-
-    .delay-3 {
-      animation-delay: 0.45s;
-    }
-
-    .delay-4 {
-      animation-delay: 0.6s;
-    }
-
-    .delay-5 {
-      animation-delay: 0.75s;
+    .hud-cell {
+      opacity: 0;
+      animation: hudSlide .7s ease forwards;
     }
   </style>
 </head>
 
 <body>
 
-  <!-- NAV -->
-  <nav>
-    <div class="nav-logo">NAVCOM <span>// FLEET OPS</span></div>
-    <div class="nav-right">
-      <a href="#features" class="nav-link">Features</a>
-      <a href="#demo" class="nav-link">System</a>
-      <a href="#cta" class="nav-link">Access</a>
+  <div id="cur"></div>
+  <div id="curR"></div>
+
+  <div id="video-phase">
+    <div class="bar top" id="barT"></div>
+    <div class="bar bot" id="barB"></div>
+    <div class="vignette"></div>
+    <video id="hero-video" autoplay muted playsinline>
+      <source src="./assets/fleet_video.mp4" type="video/mp4" />
+    </video>
+    <div class="vid-overlay">
+      <h1>Fleet<br />Command</h1>
+      <p>Total situational awareness</p>
+    </div>
+    <button id="skip-btn" onclick="goMap()">Skip intro ›</button>
+  </div>
+
+  <div id="map-phase">
+    <nav class="hud-nav">
+      <div class="nav-logo">NAVCOM // FLEET OPS</div>
+      <ul class="nav-links">
+        <a href="./app.html" class="launch-btn">◆ Enter Ops Centre</a>
+      </ul>
       <div class="nav-status">
-        <div class="nav-status-dot"></div>
-        SYSTEM LIVE
+        <div class="dot"></div><span id="clock">LIVE · 00:00 UTC</span>
+      </div>
+    </nav>
+
+    <div class="map-wrap" id="mapWrap">
+      <canvas id="mapCanvas"></canvas>
+      <svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="tip">
+        <div class="tt-n" id="ttN"></div>
+        <div class="tt-r">Type &ensp;<span id="ttT"></span></div>
+        <div class="tt-r">Speed &ensp;<span id="ttS"></span></div>
+        <div class="tt-r">Status &ensp;<span id="ttSt"></span></div>
+      </div>
+      <div id="panel">
+        <button class="p-close" onclick="closeP()">← Close</button>
+        <div class="p-name" id="pN"></div>
+        <div class="p-type" id="pT"></div>
+        <div class="p-div"></div>
+        <div class="p-row"><span class="p-key">Status</span><span class="p-val" id="pSt"></span></div>
+        <div class="p-row"><span class="p-key">Speed</span><span class="p-val" id="pSp"></span></div>
+        <div class="p-row"><span class="p-key">Heading</span><span class="p-val" id="pH"></span></div>
+        <div class="p-row"><span class="p-key">Cargo</span><span class="p-val" id="pC"></span></div>
+        <div class="p-row"><span class="p-key">Fuel</span><span class="p-val" id="pF"></span></div>
+        <div class="p-row"><span class="p-key">ETA</span><span class="p-val a" id="pE"></span></div>
+        <div class="p-div"></div>
+        <div class="p-row"><span class="p-key">Crew</span><span class="p-val" id="pCr"></span></div>
+        <div class="p-row"><span class="p-key">Commander</span><span class="p-val" id="pCm"></span></div>
+      </div>
+      <div id="launch-cta">
+        <p>// Naval operations centre ready</p>
+        <a href="./app.html">⟶ Launch Ops Centre</a>
       </div>
     </div>
-  </nav>
 
-  <!-- HERO -->
-  <section id="hero">
-    <div class="hero-grid"></div>
-    <div class="hero-lines"></div>
-    <div class="hero-radar-bg"></div>
-
-    <!-- Scattered ship blips -->
-    <div class="ship-blip cyan" style="top:22%; left:62%"></div>
-    <div class="ship-blip green" style="top:38%; left:72%"></div>
-    <div class="ship-blip amber" style="top:55%; left:66%"></div>
-    <div class="ship-blip red" style="top:44%; left:80%"></div>
-    <div class="ship-blip cyan" style="top:62%; left:75%"></div>
-    <div class="ship-blip green" style="top:30%; left:77%"></div>
-    <div class="ship-blip cyan" style="top:70%; left:58%"></div>
-
-    <div class="hero-content">
-      <div class="hero-eyebrow fade-up">
-        <div class="hero-eyebrow-line"></div>
-        <div class="hero-eyebrow-text">⚡ STRAIT OF HORMUZ CRISIS</div>
-        <div class="hero-eyebrow-badge">OPERATION ACTIVE</div>
-      </div>
-
-      <h1 class="hero-title fade-up delay-1">
-        FLEET<br>
-        <span class="cyan">COMMAND</span><br>
-        <span class="dim">OPS</span>
-      </h1>
-
-      <p class="hero-subtitle fade-up delay-2">
-        Real-time naval intelligence.<br>
-        <strong>AI-powered</strong> threat analysis, A* optimal routing,<br>
-        and live proximity alerts — for 15 vessels.
-      </p>
-
-      <div class="hero-cta-row fade-up delay-3">
-        <a href="./app.html" class="btn-primary">◆ LAUNCH OPS CENTRE</a>
-        <a href="#features" class="btn-secondary">
-          ▶ VIEW CAPABILITIES
-        </a>
-      </div>
-
-      <div class="hero-stats fade-up delay-4">
-        <div class="hero-stat">
-          <div class="hero-stat-value">15</div>
-          <div class="hero-stat-label">Vessels Tracked</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-value">1HZ</div>
-          <div class="hero-stat-label">Update Rate</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-value">A*</div>
-          <div class="hero-stat-label">Routing Algorithm</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-value">2KM</div>
-          <div class="hero-stat-label">Collision Threshold</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ALERT TICKER -->
-  <div class="ticker-wrap">
-    <div class="ticker-label">⚡ ALERTS</div>
-    <div class="ticker-track">
-      <span class="ticker-item">PROXIMITY — Gharial & Lotus within 1.64km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">WEATHER_WARNING — Kite entering heavy weather corridor — <span>Beaufort 7</span></span>
-      <span class="ticker-item">PROXIMITY — Iris & Mirage within 1.56km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">PROXIMITY — Aurora & Orca within 1.69km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">WEATHER_WARNING — Jade entering heavy weather corridor — <span>Beaufort 7</span></span>
-      <span class="ticker-item">COMMS OFFLINE — Orca primary communications offline — <span>MV-15</span></span>
-      <span class="ticker-item">PROXIMITY — Halcyon & Mirage within 1.26km — <span>COLLISION RISK</span></span>
-      <!-- duplicate for seamless loop -->
-      <span class="ticker-item">PROXIMITY — Gharial & Lotus within 1.64km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">WEATHER_WARNING — Kite entering heavy weather corridor — <span>Beaufort 7</span></span>
-      <span class="ticker-item">PROXIMITY — Iris & Mirage within 1.56km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">PROXIMITY — Aurora & Orca within 1.69km — <span>COLLISION RISK</span></span>
-      <span class="ticker-item">WEATHER_WARNING — Jade entering heavy weather corridor — <span>Beaufort 7</span></span>
-      <span class="ticker-item">COMMS OFFLINE — Orca primary communications offline — <span>MV-15</span></span>
-      <span class="ticker-item">PROXIMITY — Halcyon & Mirage within 1.26km — <span>COLLISION RISK</span></span>
+    <div class="hud-bar">
+      <div class="hud-cell" style="animation-delay:.05s"><span class="hud-lbl">Active Units</span><span
+          class="hud-val g">15</span></div>
+      <div class="hud-cell" style="animation-delay:.12s"><span class="hud-lbl">Nominal</span><span
+          class="hud-val a">13</span></div>
+      <div class="hud-cell" style="animation-delay:.19s"><span class="hud-lbl">In Transit</span><span
+          class="hud-val">15</span></div>
+      <div class="hud-cell" style="animation-delay:.26s"><span class="hud-lbl">Alerts</span><span
+          class="hud-val r">2</span></div>
+      <div class="hud-cell" style="animation-delay:.33s"><span class="hud-lbl">Update Rate</span><span class="hud-val">1
+          Hz</span></div>
+      <div class="hud-cell" style="animation-delay:.40s"><span class="hud-lbl">Routing</span><span
+          class="hud-val g">A*</span></div>
+      <div class="hud-cell" style="animation-delay:.47s"><span class="hud-lbl">Threat Level</span><span
+          class="hud-val r">CRISIS</span></div>
+      <div class="hud-cell" style="animation-delay:.54s"><span class="hud-lbl">AI Status</span><span
+          class="hud-val g">ONLINE</span></div>
     </div>
   </div>
 
-  <!-- FEATURES -->
-  <section id="features">
-    <div class="section-header">
-      <div>
-        <div class="section-label">// SYSTEM CAPABILITIES</div>
-        <div class="section-title">TACTICAL<br><span class="accent">INTELLIGENCE</span></div>
-      </div>
-      <div class="section-desc">
-        A full-spectrum maritime command platform built for high-stakes geopolitical operations.
-      </div>
-    </div>
+  <script>
+    const cur = document.getElementById('cur'), curR = document.getElementById('curR');
+    let mx = 0, my = 0;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.left = mx + 'px'; cur.style.top = my + 'px'; });
+    (function tick() { curR.style.left = mx + 'px'; curR.style.top = my + 'px'; requestAnimationFrame(tick); })();
 
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-num">01</div>
-        <div class="feature-icon">◈</div>
-        <div class="feature-title">Live Fleet Registry</div>
-        <div class="feature-desc">15 vessels tracked at 1Hz. Real-time position, speed, heading, and fuel status for
-          every ship in the operational zone.</div>
-        <div class="feature-tag">REAL-TIME · AIS DATA</div>
-      </div>
+    const vPhase = document.getElementById('video-phase');
+    const mPhase = document.getElementById('map-phase');
+    const vid = document.getElementById('hero-video');
+    let transitioned = false;
 
-      <div class="feature-card alert">
-        <div class="feature-num">02</div>
-        <div class="feature-icon">⚡</div>
-        <div class="feature-title">Proximity Alerts</div>
-        <div class="feature-desc">Automatic collision risk detection when vessels close within 2km. Instant alert feed
-          with vessel IDs and closure rates.</div>
-        <div class="feature-tag">AUTO-DETECT · 2KM THRESHOLD</div>
-      </div>
+    setTimeout(() => { document.getElementById('barT').classList.add('open'); document.getElementById('barB').classList.add('open'); }, 350);
 
-      <div class="feature-card">
-        <div class="feature-num">03</div>
-        <div class="feature-icon">◉</div>
-        <div class="feature-title">Tactical Radar</div>
-        <div class="feature-desc">250NM tactical radar overlay with live sweep, vessel blips, and sector classification
-          for situational awareness.</div>
-        <div class="feature-tag">250NM · LIVE SWEEP</div>
-      </div>
+    function goMap() {
+      if (transitioned) return; transitioned = true;
+      vPhase.classList.add('out');
+      mPhase.classList.add('in');
+      setTimeout(() => { vPhase.style.display = 'none'; initMap(); }, 1900);
+    }
 
-      <div class="feature-card amber-card">
-        <div class="feature-num">04</div>
-        <div class="feature-icon">◆</div>
-        <div class="feature-title">AI Command Briefing</div>
-        <div class="feature-desc">Natural language AI briefings on fleet status. Ask the system anything — vessel
-          states, threat levels, routing options.</div>
-        <div class="feature-tag">NLP · CLAUDE AI</div>
-      </div>
+    vid.addEventListener('ended', goMap);
+    vid.addEventListener('error', () => setTimeout(goMap, 500));
+    setTimeout(() => { if (!transitioned) goMap(); }, 14000);
 
-      <div class="feature-card">
-        <div class="feature-num">05</div>
-        <div class="feature-icon">▲</div>
-        <div class="feature-title">A* Optimal Routing</div>
-        <div class="feature-desc">Pathfinding algorithm computes optimal routes through restricted zones, avoiding
-          hazards and collision corridors in real-time.</div>
-        <div class="feature-tag">A* ALGORITHM · DYNAMIC</div>
-      </div>
+    const SHIPS = [
+      { id: 'MV-01', name: 'ISV Iris', type: 'Cargo', x: .13, y: .40, spd: '13 kn', hdg: '114°', cargo: 'Containers', fuel: '71%', crew: 24, cmdr: 'Cpt. A. Harlow', st: 'active', eta: '2h 14m', col: '#00ff88' },
+      { id: 'MV-02', name: 'ISV Jade', type: 'LNG Carrier', x: .27, y: .58, spd: '20 kn', hdg: '270°', cargo: 'LNG', fuel: '75%', crew: 28, cmdr: 'Cpt. D. Vasquez', st: 'active', eta: '5h 40m', col: '#00ff88' },
+      { id: 'MV-03', name: 'ISV Kite', type: 'Tanker', x: .44, y: .28, spd: '18 kn', hdg: '045°', cargo: 'Crude Oil', fuel: '85%', crew: 22, cmdr: 'Cpt. K. Osei', st: 'patrol', eta: '8h 00m', col: '#00d4ff' },
+      { id: 'MV-04', name: 'ISV Lotus', type: 'Bulk Carrier', x: .60, y: .52, spd: '12 kn', hdg: '185°', cargo: 'Grain', fuel: '70%', crew: 20, cmdr: 'Cpt. R. Nakamura', st: 'active', eta: '3h 30m', col: '#00ff88' },
+      { id: 'MV-05', name: 'ISV Mirage', type: 'Container Ship', x: .76, y: .34, spd: '21 kn', hdg: '310°', cargo: 'Electronics', fuel: '85%', crew: 26, cmdr: 'Cpt. P. Ellison', st: 'patrol', eta: '1h 50m', col: '#00d4ff' },
+      { id: 'MV-06', name: 'ISV Nova', type: 'RoRo', x: .20, y: .72, spd: '11 kn', hdg: '090°', cargo: 'Vehicles', fuel: '71%', crew: 18, cmdr: 'Cpt. T. Murata', st: 'hold', eta: '12h', col: '#ff0055' },
+      { id: 'MV-07', name: 'ISV Orca', type: 'Cargo', x: .52, y: .67, spd: '13 kn', hdg: '230°', cargo: 'Machinery', fuel: '72%', crew: 24, cmdr: 'Cpt. S. Brandt', st: 'active', eta: '4h 20m', col: '#00ff88' },
+      { id: 'MV-08', name: 'ISV Aurora', type: 'LNG Carrier', x: .37, y: .76, spd: '19 kn', hdg: '160°', cargo: 'LNG', fuel: '68%', crew: 28, cmdr: 'Cpt. M. Cohen', st: 'active', eta: '6h 10m', col: '#00ff88' },
+      { id: 'MV-09', name: 'ISV Halcyon', type: 'Tanker', x: .83, y: .62, spd: '15 kn', hdg: '060°', cargo: 'Fuel Oil', fuel: '90%', crew: 22, cmdr: 'Cpt. A. Torres', st: 'patrol', eta: '0h 45m', col: '#00d4ff' },
+      { id: 'MV-10', name: 'ISV Gharial', type: 'Bulk Carrier', x: .66, y: .74, spd: '10 kn', hdg: '000°', cargo: 'Coal', fuel: '55%', crew: 20, cmdr: 'Cpt. J. Okonkwo', st: 'hold', eta: '—', col: '#ff0055' },
+    ];
+    const ROUTES = [[0, 3], [1, 7], [2, 4], [6, 9], [8, 4], [5, 7], [3, 9]];
+    const PORTS = [{ name: 'Strait Entry', x: .07, y: .22 }, { name: 'Strait Exit', x: .89, y: .82 }, { name: 'Naval HQ', x: .50, y: .08 }];
+    const VELS = SHIPS.map(() => ({ vx: (Math.random() - .5) * .00035, vy: (Math.random() - .5) * .00018 }));
+    let W = 0, H = 0, shipEls = [];
 
-      <div class="feature-card alert">
-        <div class="feature-num">06</div>
-        <div class="feature-icon">▣</div>
-        <div class="feature-title">Geofence Zones</div>
-        <div class="feature-desc">Draw custom exclusion and alert zones directly on the map. Instant breach detection
-          with severity classification.</div>
-        <div class="feature-tag">CUSTOM ZONES · DRAW MODE</div>
-      </div>
+    function drawOcean(ctx) {
+      const g = ctx.createRadialGradient(W * .5, H * .5, 0, W * .5, H * .5, Math.max(W, H) * .9);
+      g.addColorStop(0, '#091524'); g.addColorStop(.5, '#060e1a'); g.addColorStop(1, '#030810');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(0,212,255,.04)'; ctx.lineWidth = .7;
+      for (let i = 0; i <= 20; i++) { const x = i * W / 20; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let j = 0; j <= 11; j++) { const y = j * H / 11; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(0,212,255,.12)';
+      ctx.font = '500 8px "Barlow Condensed",sans-serif';
+      ['55°E', '56°E', '57°E', '58°E', '59°E', '60°E'].forEach((l, i) => ctx.fillText(l, i * W / 5 + 3, 11));
+      ['27°N', '26°N', '25°N', '24°N', '23°N', '22°N'].forEach((l, j) => ctx.fillText(l, 3, j * H / 5 + 10));
+      ctx.fillStyle = 'rgba(0,8,20,.4)';
+      [[.32, .62, .18, .12, -.2], [.72, .38, .14, .10, .1], [.5, .5, .22, .15, 0]].forEach(([cx, cy, rx, ry, a]) => {
+        ctx.beginPath(); ctx.ellipse(W * cx, H * cy, W * rx, H * ry, a, 0, Math.PI * 2); ctx.fill();
+      });
+    }
 
-      <div class="feature-card">
-        <div class="feature-num">07</div>
-        <div class="feature-icon">⬡</div>
-        <div class="feature-title">Timeline Playback</div>
-        <div class="feature-desc">Full mission timeline with T+0 replay capability. Scrub through historical positions
-          and incident reconstructions.</div>
-        <div class="feature-tag">REPLAY · T+0 ORIGIN</div>
-      </div>
+    function buildSVG() {
+      const svg = document.getElementById('mapSvg');
+      svg.innerHTML = '';
+      const NS = 'http://www.w3.org/2000/svg';
+      const e = (tag, a, p = svg) => { const el = document.createElementNS(NS, tag); Object.entries(a).forEach(([k, v]) => el.setAttribute(k, v)); p.appendChild(el); return el; };
+      e('defs').innerHTML = `<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>`;
+      ROUTES.forEach(([ai, bi]) => {
+        const a = SHIPS[ai], b = SHIPS[bi];
+        const x1 = a.x * W, y1 = a.y * H, x2 = b.x * W, y2 = b.y * H;
+        e('line', { x1, y1, x2, y2, stroke: 'rgba(0,212,255,.06)', 'stroke-width': '5' });
+        e('line', { x1, y1, x2, y2, stroke: 'rgba(0,212,255,.35)', 'stroke-width': '1', 'stroke-dasharray': '8 7', 'marker-end': 'url(#arr)', style: `animation:dashMove ${3 + Math.random() * 2}s linear infinite` });
+      });
+      PORTS.forEach(p => {
+        const x = p.x * W, y = p.y * H, g = e('g');
+        e('polygon', { points: `${x},${y - 7} ${x + 6},${y + 5} ${x - 6},${y + 5}`, fill: 'none', stroke: 'rgba(0,212,255,.45)', 'stroke-width': '1.2' }, g);
+        e('text', { x: x + 10, y: y + 2, fill: 'rgba(0,212,255,.5)', 'font-family': 'Barlow Condensed,sans-serif', 'font-size': '8', 'letter-spacing': '2' }, g).textContent = p.name.toUpperCase();
+      });
+      shipEls = [];
+      const tip = document.getElementById('tip'), wrap = document.getElementById('mapWrap');
+      SHIPS.forEach((s, i) => {
+        const x = s.x * W, y = s.y * H, g = e('g');
+        g.style.cssText = `transform:translate(${x}px,${y}px); cursor:none;`;
+        e('circle', { cx: 0, cy: 0, r: 0, fill: 'none', stroke: s.col, 'stroke-width': '.9', 'stroke-opacity': '.6', style: `animation:radarOut ${2.4 + i * .28}s ease-out infinite;animation-delay:${i * .22}s` }, g);
+        const sz = 7;
+        e('polygon', { points: `0,${-sz * 1.9} ${sz},${sz} 0,${sz * .7} ${-sz},${sz}`, fill: s.col, 'fill-opacity': '.88', stroke: s.col, 'stroke-width': '.5' }, g);
+        e('circle', { cx: 0, cy: 0, r: sz * 1.65, fill: 'none', stroke: s.col, 'stroke-width': '.5', 'stroke-opacity': '.3' }, g);
+        e('text', { x: sz * 1.9, y: 4, fill: s.col, 'font-family': 'Barlow Condensed,sans-serif', 'font-size': '8', 'letter-spacing': '1.5', 'font-weight': '700', 'fill-opacity': '.75' }, g).textContent = s.id;
+        g.addEventListener('mouseenter', () => { document.getElementById('ttN').textContent = s.name; document.getElementById('ttT').textContent = s.type; document.getElementById('ttS').textContent = s.spd; document.getElementById('ttSt').textContent = s.st.toUpperCase(); tip.classList.add('show'); });
+        g.addEventListener('mousemove', ev => { const r = wrap.getBoundingClientRect(); let tx = ev.clientX - r.left + 16, ty = ev.clientY - r.top + 16; if (tx + 190 > W) tx = ev.clientX - r.left - 206; tip.style.left = tx + 'px'; tip.style.top = ty + 'px'; });
+        g.addEventListener('mouseleave', () => tip.classList.remove('show'));
+        g.addEventListener('click', () => openP(s));
+        svg.appendChild(g); shipEls.push(g);
+      });
+    }
 
-      <div class="feature-card amber-card">
-        <div class="feature-num">08</div>
-        <div class="feature-icon">✦</div>
-        <div class="feature-title">Captain Role System</div>
-        <div class="feature-desc">Role-based access with Captain override authority. Multi-user command hierarchy with
-          authenticated command logging.</div>
-        <div class="feature-tag">RBAC · COMMAND AUTH</div>
-      </div>
+    function moveShips() {
+      SHIPS.forEach((s, i) => {
+        const v = VELS[i];
+        s.x = Math.max(.02, Math.min(.96, s.x + v.vx)); s.y = Math.max(.07, Math.min(.91, s.y + v.vy));
+        if (s.x < .03 || s.x > .95) v.vx *= -1; if (s.y < .08 || s.y > .90) v.vy *= -1;
+        if (shipEls[i]) shipEls[i].style.transform = `translate(${s.x * W}px,${s.y * H}px)`;
+      });
+      requestAnimationFrame(moveShips);
+    }
 
-      <div class="feature-card">
-        <div class="feature-num">09</div>
-        <div class="feature-icon">◐</div>
-        <div class="feature-title">Weather Corridor Intel</div>
-        <div class="feature-desc">Beaufort scale weather warnings integrated into routing decisions. Storm corridor
-          avoidance for all active vessels.</div>
-        <div class="feature-tag">BEAUFORT · LIVE WEATHER</div>
-      </div>
-    </div>
-  </section>
+    function openP(s) {
+      document.getElementById('pN').textContent = s.name;
+      document.getElementById('pT').textContent = s.type;
+      document.getElementById('pSt').innerHTML = `<span class="badge ${s.st}">${s.st.toUpperCase()}</span>`;
+      document.getElementById('pSp').textContent = s.spd;
+      document.getElementById('pH').textContent = s.hdg;
+      document.getElementById('pC').textContent = s.cargo;
+      document.getElementById('pF').textContent = s.fuel;
+      document.getElementById('pE').textContent = s.eta;
+      document.getElementById('pCr').textContent = s.crew + ' personnel';
+      document.getElementById('pCm').textContent = s.cmdr;
+      document.getElementById('panel').classList.add('open');
+    }
+    function closeP() { document.getElementById('panel').classList.remove('open'); }
 
-  <!-- RADAR DEMO -->
-  <section id="demo">
-    <div class="demo-inner">
-      <div class="demo-radar-wrap">
-        <div class="radar-container">
-          <div class="radar-ring"></div>
-          <div class="radar-ring"></div>
-          <div class="radar-ring"></div>
-          <div class="radar-ring"></div>
-          <div class="radar-crosshair"></div>
-          <div class="radar-crosshair vertical"></div>
-          <div class="radar-glow"></div>
-          <div class="radar-sweep"></div>
-          <div class="radar-label">TACTICAL RADAR · 250NM</div>
+    function initMap() {
+      const wrap = document.getElementById('mapWrap'), canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d');
+      function resize() { W = wrap.clientWidth; H = wrap.clientHeight; canvas.width = W; canvas.height = H; drawOcean(ctx); buildSVG(); }
+      resize(); window.addEventListener('resize', resize); moveShips();
+      function tick() { const d = new Date(); document.getElementById('clock').textContent = `LIVE · ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`; }
+      tick(); setInterval(tick, 1000);
+    }
 
-          <!-- blips -->
-          <div class="radar-blip-dot" style="top:30%; left:58%"></div>
-          <div class="radar-blip-dot" style="top:55%; left:42%; animation-delay:1s"></div>
-          <div class="radar-blip-dot" style="top:44%; left:63%; animation-delay:0.5s"></div>
-          <div class="radar-blip-dot" style="top:68%; left:52%; animation-delay:1.5s"></div>
-          <div class="radar-blip-dot" style="top:38%; left:46%; animation-delay:0.8s"></div>
-          <div class="radar-blip-dot" style="top:25%; left:48%; animation-delay:2s" style="background:var(--amber)">
-          </div>
-          <div class="radar-blip-dot" style="top:60%; left:60%; background:var(--red); animation-delay:0.3s"></div>
-        </div>
-      </div>
-
-      <div class="demo-text">
-        <div class="section-label">// AI COMMAND INTERFACE</div>
-        <div class="section-title">REAL-TIME<br><span class="accent">INTEL</span></div>
-        <p>The AI CMD terminal lets operators query the entire fleet in plain English. Instant briefings, rerouting
-          commands, and threat assessments — delivered in seconds.</p>
-
-        <div class="terminal-block">
-          <div class="terminal-line"><span class="prompt">◆ AI CMD &gt;</span> <span class="cyan">What's the fleet
-              status?</span></div>
-          <div class="terminal-line"> </div>
-          <div class="terminal-line green">NAVCOM BRIEF // T+36M</div>
-          <div class="terminal-line"> </div>
-          <div class="terminal-line">Vessels nominal: <span class="cyan" style="color:var(--cyan)">13</span></div>
-          <div class="terminal-line">Alert status: <span style="color:var(--red)">2 PROXIMITY RISKS</span></div>
-          <div class="terminal-line">Weather: <span style="color:var(--amber)">Beaufort 7 corridor active</span></div>
-          <div class="terminal-line">Recommended: <span class="cyan" style="color:var(--cyan)">Reroute Kite via NW
-              passage</span></div>
-          <div class="terminal-line"> </div>
-          <div class="terminal-line"><span class="prompt">◆ AI CMD &gt;</span> <span class="cursor-blink"></span></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section id="cta">
-    <div class="cta-stamp">CLASSIFIED ACTIVE</div>
-    <div class="cta-title">
-      ENTER THE<br>
-      <span class="line2">COMMAND CENTRE</span>
-    </div>
-    <div class="cta-desc">Operational intelligence for 15 vessels — live, right now.</div>
-    <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
-      <a href="./app.html" class="btn-primary">◆ LAUNCH OPS CENTRE</a>
-      <a href="#features" class="btn-secondary">
-        ▶ CAPABILITIES
-      </a>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer>
-    <div class="footer-left">NAVCOM // FLEET OPS &nbsp;·&nbsp; AI COMMAND PLATFORM &nbsp;·&nbsp; HACKATHON BUILD 2025
-    </div>
-    <div class="footer-coords">
-      <span>24.3452°N</span> &nbsp;<span>54.6460°E</span> &nbsp;·&nbsp; STRAIT OF HORMUZ
-    </div>
-  </footer>
-
+    const s = document.createElement('style');
+    s.textContent = `@keyframes dashMove{to{stroke-dashoffset:-60}} @keyframes radarOut{0%{r:0;stroke-opacity:.7}100%{r:30;stroke-opacity:0}}`;
+    document.head.appendChild(s);
+  </script>
 </body>
 
 </html>
