@@ -57,13 +57,18 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
     return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-async function sendDirective(ship: any, type: string, message: string) {
-    // Use real directive endpoint
-    await fetch(`${BASE}/api/directives`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipId: ship.shipId, type, payload: { message } }),
-    });
+async function sendDirective(ship: any, type: string, message: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+        const r = await fetch(`${BASE}/api/directives`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipId: ship.shipId, type, payload: { message } }),
+        });
+        if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+        return { ok: true };
+    } catch (err: any) {
+        return { ok: false, error: err?.message || 'network error' };
+    }
 }
 
 export function ShipDetail() {
@@ -72,6 +77,7 @@ export function ShipDetail() {
 
     const [msg, setMsg] = useState('');
     const [sending, setSending] = useState(false);
+    const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null);
     const [sentTick, setSentTick] = useState(0);
     const [routeOptions, setRouteOptions] = useState<RouteCandidate[] | null>(null);
     const [loadingRoutes, setLoadingRoutes] = useState(false);
@@ -84,22 +90,26 @@ export function ShipDetail() {
             </div>
         );
     }
-
     const sendMessage = async () => {
         if (!msg.trim()) return;
         setSending(true);
-        await api.postAlert({
-            type: 'COMMAND_MESSAGE',
-            shipId: ship.shipId,
-            severity: 'medium',
-            message: `[CMD → ${ship.name}] ${msg}`,
-        });
-        setSending(false);
-        setSentTick(Date.now());
-        setMsg('');
-        setTimeout(() => setSentTick(0), 2500);
+        try {
+            await api.postAlert({
+                type: 'COMMAND_MESSAGE',
+                shipId: ship.shipId,
+                severity: 'medium',
+                message: `[CMD → ${ship.name}] ${msg}`,
+            });
+            setSentTick(Date.now());
+            setMsg('');
+            setTimeout(() => setSentTick(0), 2500);
+        } catch (err: any) {
+            setToast({ text: `✗ Failed to transmit: ${err?.message || 'unknown error'}`, kind: 'error' });
+            setTimeout(() => setToast(null), 4000);
+        } finally {
+            setSending(false);
+        }
     };
-
     const destPort = ship.destination ? PORTS[ship.destination] : null;
     const distance = destPort ? haversine(ship.lat, ship.lng, destPort.lat, destPort.lng) : 0;
     const etaHours = ship.speed > 0 && distance > 0 ? distance / ship.speed : 0;
@@ -265,19 +275,59 @@ export function ShipDetail() {
             </div>
 
             <div className="directive-grid">
-                <button className="directive-btn reroute" onClick={() => sendDirective(ship, 'REROUTE', 'Alter course to safe corridor')}>
+                <button className="directive-btn reroute" onClick={async () => {
+                    const r = await sendDirective(ship, 'REROUTE', 'Alter course to safe corridor');
+                    setToast(r.ok
+                        ? { text: `✓ REROUTE dispatched to ${ship.name} — awaiting captain ack`, kind: 'ok' }
+                        : { text: `✗ REROUTE failed: ${r.error}`, kind: 'error' });
+                    setTimeout(() => setToast(null), 4000);
+                }}>
                     REROUTE
                 </button>
-                <button className="directive-btn hold" onClick={() => sendDirective(ship, 'HOLD', 'Maintain position and hold')}>
+                <button className="directive-btn hold" onClick={async () => {
+                    const r = await sendDirective(ship, 'HOLD', 'Maintain position and hold');
+                    setToast(r.ok
+                        ? { text: `✓ HOLD dispatched to ${ship.name} — awaiting captain ack`, kind: 'ok' }
+                        : { text: `✗ HOLD failed: ${r.error}`, kind: 'error' });
+                    setTimeout(() => setToast(null), 4000);
+                }}>
                     HOLD
                 </button>
-                <button className="directive-btn divert" onClick={() => sendDirective(ship, 'DIVERT', 'Divert to nearest safe port')}>
+                <button className="directive-btn divert" onClick={async () => {
+                    const r = await sendDirective(ship, 'DIVERT', 'Divert to nearest safe port');
+                    setToast(r.ok
+                        ? { text: `✓ DIVERT dispatched to ${ship.name} — awaiting captain ack`, kind: 'ok' }
+                        : { text: `✗ DIVERT failed: ${r.error}`, kind: 'error' });
+                    setTimeout(() => setToast(null), 4000);
+                }}>
                     DIVERT
                 </button>
-                <button className="directive-btn emergency" onClick={() => sendDirective(ship, 'EMERGENCY', 'EMERGENCY PROTOCOL ACTIVATED')}>
+                <button className="directive-btn emergency" onClick={async () => {
+                    const r = await sendDirective(ship, 'EMERGENCY', 'EMERGENCY PROTOCOL ACTIVATED');
+                    setToast(r.ok
+                        ? { text: `✓ EMERGENCY dispatched to ${ship.name}`, kind: 'ok' }
+                        : { text: `✗ EMERGENCY failed: ${r.error}`, kind: 'error' });
+                    setTimeout(() => setToast(null), 4000);
+                }}>
                     ⚠ EMERGENCY
                 </button>
             </div>
+
+            {toast && (
+                <div style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 2,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    background: toast.kind === 'ok' ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 51, 102, 0.12)',
+                    border: `1px solid ${toast.kind === 'ok' ? 'var(--green)' : 'var(--red)'}`,
+                    color: toast.kind === 'ok' ? 'var(--green)' : 'var(--red)',
+                }}>
+                    {toast.text}
+                </div>
+            )}
 
             {/* Multi-route options (bonus): generate alternative paths and let operator pick */}
             <div style={{ marginTop: 12 }}>
