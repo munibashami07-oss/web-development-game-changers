@@ -10,8 +10,13 @@ export interface Zone {
 
 let zones: Zone[] = [];
 
-export function getZones() {
-    return zones;
+export function getZones() { return zones; }
+
+function broadcastSafely(msg: any) {
+    try {
+        const { broadcast } = require("./websocket");
+        broadcast(msg);
+    } catch { }
 }
 
 export function addZone(data: { name?: string; polygon: [number, number][] }): Zone {
@@ -23,16 +28,17 @@ export function addZone(data: { name?: string; polygon: [number, number][] }): Z
     };
     zones.push(zone);
     notifyZoneChanged();
+    broadcastSafely({ type: "ZONE_ADDED", zone });
     return zone;
 }
 
 export function removeZone(id: string) {
     zones = zones.filter((z) => z.id !== id);
     notifyZoneChanged();
+    broadcastSafely({ type: "ZONE_REMOVED", id });
 }
 
 function notifyZoneChanged() {
-    // Lazy require to avoid circular dep
     try {
         const { onZoneChanged } = require("./simulator");
         onZoneChanged();
@@ -40,17 +46,6 @@ function notifyZoneChanged() {
 }
 
 export const zonesRouter = Router();
-
-zonesRouter.get("/zones", (req, res) => {
-    res.json({ zones });
-});
-
-zonesRouter.post("/zones", (req, res) => {
-    const zone = addZone(req.body);
-    res.json(zone);
-});
-
-zonesRouter.delete("/zones/:id", (req, res) => {
-    removeZone(req.params.id);
-    res.json({ ok: true });
-});
+zonesRouter.get("/zones", (req, res) => res.json({ zones }));
+zonesRouter.post("/zones", (req, res) => res.json(addZone(req.body)));
+zonesRouter.delete("/zones/:id", (req, res) => { removeZone(req.params.id); res.json({ ok: true }); });

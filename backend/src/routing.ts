@@ -1,32 +1,10 @@
 // backend/src/routing.ts
-// A* pathfinding on a coarse grid over the operational area.
-// Avoids land (Qatar peninsula, Bahrain, southern Iran/Oman coast strip) and restricted zones.
+// A* pathfinding. Bbox / navigable polygon / land masses now loaded from
+// fleet.json via config.ts, so swapping fleet.json swaps the operational
+// area without code changes. Also exports findMultiplePaths for the
+// bonus "multiple route options on reroute" feature.
 
-// Operational area bounding box: Persian Gulf + Gulf of Oman
-const BBOX = { minLat: 23.5, maxLat: 30.0, minLng: 47.5, maxLng: 60.0 };
-
-// Big permissive water polygon — everything inside the BBOX is navigable
-// EXCEPT for the land masses below. This keeps ships out of trouble without
-// over-constraining their starting positions.
-export const NAVIGABLE_WATER: [number, number][] = [
-    [BBOX.minLat, BBOX.minLng],
-    [BBOX.minLat, BBOX.maxLng],
-    [BBOX.maxLat, BBOX.maxLng],
-    [BBOX.maxLat, BBOX.minLng],
-    [BBOX.minLat, BBOX.minLng],
-];
-
-// Land masses to avoid (rough polygons)
-const LAND_MASSES: [number, number][][] = [
-    // Qatar peninsula (rough rectangle)
-    [[24.55, 51.10], [25.95, 50.95], [26.10, 51.50], [25.50, 51.65], [24.85, 51.55], [24.55, 51.10]],
-    // Bahrain
-    [[25.95, 50.42], [26.32, 50.42], [26.32, 50.68], [25.95, 50.68]],
-    // Northern Iranian coast inland (rough strip — anything north of Bandar Abbas line)
-    [[27.20, 53.50], [29.00, 53.50], [29.00, 56.50], [27.20, 56.50]],
-    // Southern Oman/UAE inland (south of operational area)
-    [[23.50, 53.00], [24.40, 53.00], [24.40, 58.00], [23.50, 58.00]],
-];
+import { getConfig } from "./config";
 
 export function pointInPolygon(point: [number, number], poly: [number, number][]): boolean {
     let inside = false;
@@ -41,10 +19,15 @@ export function pointInPolygon(point: [number, number], poly: [number, number][]
 }
 
 export function isNavigable(point: [number, number]): boolean {
-    if (point[0] < BBOX.minLat || point[0] > BBOX.maxLat) return false;
-    if (point[1] < BBOX.minLng || point[1] > BBOX.maxLng) return false;
-    for (const land of LAND_MASSES) {
-        if (pointInPolygon(point, land)) return false;
+    const cfg = getConfig();
+    const bb = cfg.bbox;
+    if (point[0] < bb.minLat || point[0] > bb.maxLat) return false;
+    if (point[1] < bb.minLng || point[1] > bb.maxLng) return false;
+    if (cfg.navigableWater && cfg.navigableWater.length >= 4) {
+        if (!pointInPolygon(point, cfg.navigableWater)) return false;
+    }
+    for (const land of cfg.landMasses) {
+        if (pointInPolygon(point, land.polygon)) return false;
     }
     return true;
 }
@@ -67,15 +50,12 @@ function haversine(a: [number, number], b: [number, number]): number {
 }
 
 const GRID = 0.15;
-
 function snap(p: [number, number]): [number, number] {
     return [Math.round(p[0] / GRID) * GRID, Math.round(p[1] / GRID) * GRID];
 }
-
 function key(p: [number, number]): string {
     return `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
 }
-
 function neighbors(p: [number, number]): [number, number][] {
     const out: [number, number][] = [];
     for (let dy = -1; dy <= 1; dy++) {
@@ -94,29 +74,20 @@ interface Node {
     parent: Node | null;
 }
 
-/**
- * Compute path from start → end avoiding zones and land.
- * Returns waypoints [start, ...intermediate, end].
- * Falls back to direct [start, end] if A* fails — never returns null,
- * so ships never get stuck unable to move.
- */
 export function findPath(
     start: [number, number],
     end: [number, number],
-    zones: { polygon: [number, number][] }[]
+    zones: { polygon: [number, number][] }[],
+    weatherPenalty?: (p: [number, number]) => number,
 ): [number, number][] {
-    // If straight line is clear (no zones, no land), skip A*
-    if (isLineClear(start, end, zones)) {
-        return [start, end];
-    }
+    if (isLineClear(start, end, zones)) return [start, end];
 
     const startSnap = snap(start);
     const endSnap = snap(end);
 
     const open: Node[] = [];
     const closed = new Set<string>();
-    const startNode: Node = { pos: startSnap, g: 0, f: haversine(startSnap, endSnap), parent: null };
-    open.push(startNode);
+    open.push({ pos: startSnap, g: 0, f: haversine(startSnap, endSnap), parent: null });
 
     let iterations = 0;
     const MAX_ITER = 3000;
@@ -131,10 +102,7 @@ export function findPath(
         if (haversine(current.pos, endSnap) < GRID * 1.5) {
             const path: [number, number][] = [end];
             let n: Node | null = current;
-            while (n) {
-                path.unshift(n.pos);
-                n = n.parent;
-            }
+            while (n) { path.unshift(n.pos); n = n.parent; }
             path[0] = start;
             return simplify(path, zones);
         }
@@ -145,7 +113,9 @@ export function findPath(
             if (!isNavigable(nb)) continue;
             if (!isClearOfZones(nb, zones)) continue;
 
-            const g = current.g + haversine(current.pos, nb);
+            let stepCost = haversine(current.pos, nb);
+            if (weatherPenalty) stepCost += weatherPenalty(nb);
+            const g = current.g + stepCost;
             const h = haversine(nb, endSnap);
             const existing = open.find(o => key(o.pos) === nk);
             if (existing && existing.g <= g) continue;
@@ -153,8 +123,71 @@ export function findPath(
         }
     }
 
-    // FALLBACK: A* failed — return direct line so ship still moves
     return [start, end];
+}
+
+export interface RouteCandidate {
+    label: "direct" | "weather_safe" | "fuel_efficient";
+    description: string;
+    path: [number, number][];
+    distanceNM: number;
+    weatherExposureNM: number;
+}
+
+export function findMultiplePaths(
+    start: [number, number],
+    end: [number, number],
+    zones: { polygon: [number, number][] }[],
+    weatherZones: { polygon: [number, number][] }[],
+): RouteCandidate[] {
+    const inWeather = (p: [number, number]) =>
+        weatherZones.some(z => pointInPolygon(p, z.polygon));
+
+    const exposureOf = (path: [number, number][]) => {
+        let nm = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            const seg = haversine(path[i], path[i + 1]);
+            const mid: [number, number] = [(path[i][0] + path[i + 1][0]) / 2, (path[i][1] + path[i + 1][1]) / 2];
+            if (inWeather(mid)) nm += seg;
+        }
+        return nm;
+    };
+
+    const direct = findPath(start, end, zones);
+    const weatherSafe = findPath(start, end, zones, p => (inWeather(p) ? 100 : 0));
+    const fuelEfficient = findPath(start, end, zones, p => (inWeather(p) ? 30 : 0));
+
+    const candidates: RouteCandidate[] = [];
+    candidates.push({
+        label: "direct",
+        description: "Shortest path. Faster but may pass through bad weather.",
+        path: direct,
+        distanceNM: pathDistance(direct),
+        weatherExposureNM: exposureOf(direct),
+    });
+    const distSafe = pathDistance(weatherSafe);
+    if (distSafe > 0 && JSON.stringify(weatherSafe) !== JSON.stringify(direct)) {
+        candidates.push({
+            label: "weather_safe",
+            description: "Avoids adverse weather. Longer but safer.",
+            path: weatherSafe,
+            distanceNM: distSafe,
+            weatherExposureNM: exposureOf(weatherSafe),
+        });
+    }
+    const distFuel = pathDistance(fuelEfficient);
+    if (distFuel > 0 &&
+        JSON.stringify(fuelEfficient) !== JSON.stringify(direct) &&
+        JSON.stringify(fuelEfficient) !== JSON.stringify(weatherSafe)) {
+        candidates.push({
+            label: "fuel_efficient",
+            description: "Balances distance and weather. Most fuel-efficient.",
+            path: fuelEfficient,
+            distanceNM: distFuel,
+            weatherExposureNM: exposureOf(fuelEfficient),
+        });
+    }
+    return candidates;
 }
 
 function isLineClear(a: [number, number], b: [number, number], zones: { polygon: [number, number][] }[]): boolean {

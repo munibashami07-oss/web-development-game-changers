@@ -1,3 +1,7 @@
+// backend/src/websocket.ts
+// Stamps every broadcast with serverTime for client-side latency measurement.
+// Sends INITIAL_STATE on connect so freshly opened tabs are in sync immediately.
+
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 
@@ -14,8 +18,21 @@ export function initWebSocket(server: http.Server) {
     wss = new WebSocketServer({ server });
 
     wss.on("connection", (ws) => {
-        let client: Client = { ws, role: "command" };
+        const client: Client = { ws, role: "command" };
         clients.push(client);
+
+        try {
+            const { getFleet } = require("./simulator");
+            const { getAlerts } = require("./alerts");
+            const { getZones } = require("./zones");
+            ws.send(JSON.stringify({
+                type: "INITIAL_STATE",
+                ships: getFleet(),
+                alerts: getAlerts(),
+                zones: getZones(),
+                serverTime: Date.now(),
+            }));
+        } catch { }
 
         ws.on("message", (data) => {
             try {
@@ -33,6 +50,9 @@ export function initWebSocket(server: http.Server) {
                     const { acknowledgeAlert } = require("./alerts");
                     acknowledgeAlert(msg.alertId);
                 }
+                if (msg.type === "PING") {
+                    ws.send(JSON.stringify({ type: "PONG", clientTime: msg.t, serverTime: Date.now() }));
+                }
             } catch (e) { }
         });
 
@@ -44,19 +64,26 @@ export function initWebSocket(server: http.Server) {
     console.log("WebSocket server initialized");
 }
 
-export function broadcast(msg: object) {
-    const data = JSON.stringify(msg);
+export function broadcast(msg: any) {
+    const stamped = { ...msg, serverTime: Date.now() };
+    const data = JSON.stringify(stamped);
     for (const client of clients) {
-        if (client.ws.readyState === WebSocket.OPEN) {
-            if ((msg as any).type === "FLEET_UPDATE" && client.role === "captain") {
-                const fleet = (msg as any).ships;
-                const ship = fleet.find((s: any) => s.shipId === client.shipId);
-                if (ship) {
-                    client.ws.send(JSON.stringify({ type: "FLEET_UPDATE", ships: [ship], timestamp: (msg as any).timestamp }));
-                }
-            } else {
-                client.ws.send(data);
+        if (client.ws.readyState !== WebSocket.OPEN) continue;
+        if (stamped.type === "FLEET_UPDATE" && client.role === "captain") {
+            const fleet = stamped.ships;
+            const ship = fleet.find((s: any) => s.shipId === client.shipId);
+            if (ship) {
+                client.ws.send(JSON.stringify({
+                    type: "FLEET_UPDATE",
+                    ships: [ship],
+                    timestamp: stamped.timestamp,
+                    serverTime: stamped.serverTime,
+                }));
             }
+        } else {
+            client.ws.send(data);
         }
     }
 }
+
+export function getClientCount() { return clients.length; }
