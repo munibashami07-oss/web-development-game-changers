@@ -1,18 +1,36 @@
-version: "3.9"
-
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: backend.Dockerfile
     ports:
       - "3001:3001"
     environment:
       - PORT=3001
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AI_SERVICE_URL=http://ai-service:3002
+    volumes:
+      - ./fleet.json:/app/fleet.json:ro
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - BACKEND_URL=http://backend:3001
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: frontend.Dockerfile
       args:
         - VITE_API_URL=http://localhost:3001
     ports:

@@ -6,6 +6,14 @@ import { AIBriefing } from './AIBriefing';
 
 const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
+interface RouteCandidate {
+    label: string;
+    description: string;
+    path: [number, number][];
+    distanceNM: number;
+    weatherExposureNM: number;
+}
+
 const PORTS: Record<string, { name: string; lat: number; lng: number }> = {
     'KWT-1': { name: 'Kuwait', lat: 29.48, lng: 48.34 },
     'BUS-1': { name: 'Bushehr', lat: 28.83, lng: 50.73 },
@@ -65,6 +73,8 @@ export function ShipDetail() {
     const [msg, setMsg] = useState('');
     const [sending, setSending] = useState(false);
     const [sentTick, setSentTick] = useState(0);
+    const [routeOptions, setRouteOptions] = useState<RouteCandidate[] | null>(null);
+    const [loadingRoutes, setLoadingRoutes] = useState(false);
 
     if (!ship) {
         return (
@@ -267,6 +277,106 @@ export function ShipDetail() {
                 <button className="directive-btn emergency" onClick={() => sendDirective(ship, 'EMERGENCY', 'EMERGENCY PROTOCOL ACTIVATED')}>
                     ⚠ EMERGENCY
                 </button>
+            </div>
+
+            {/* Multi-route options (bonus): generate alternative paths and let operator pick */}
+            <div style={{ marginTop: 12 }}>
+                {!routeOptions ? (
+                    <button
+                        onClick={async () => {
+                            setLoadingRoutes(true);
+                            try {
+                                const r = await fetch(`${BASE}/api/routes/${ship.shipId}`);
+                                const data = await r.json();
+                                setRouteOptions(data.routes || []);
+                            } catch { /* noop */ }
+                            setLoadingRoutes(false);
+                        }}
+                        disabled={loadingRoutes}
+                        style={{
+                            width: '100%',
+                            background: 'transparent',
+                            border: '1px dashed var(--cyan)',
+                            color: 'var(--cyan)',
+                            padding: '6px',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 10,
+                            letterSpacing: 1.5,
+                            cursor: 'pointer',
+                            borderRadius: 2,
+                        }}
+                    >
+                        {loadingRoutes ? 'COMPUTING...' : '🗺 SHOW ROUTE OPTIONS'}
+                    </button>
+                ) : (
+                    <div style={{
+                        padding: 8,
+                        background: 'rgba(0, 212, 255, 0.06)',
+                        border: '1px solid var(--cyan)',
+                        borderRadius: 2,
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: 2, color: 'var(--cyan)' }}>
+                                ROUTE OPTIONS ({routeOptions.length})
+                            </span>
+                            <span
+                                onClick={() => setRouteOptions(null)}
+                                style={{ cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}
+                            >✕ CLOSE</span>
+                        </div>
+                        {routeOptions.length === 0 && (
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', padding: 4 }}>
+                                No alternative routes available.
+                            </div>
+                        )}
+                        {routeOptions.map(opt => (
+                            <div key={opt.label} style={{
+                                padding: 6,
+                                marginBottom: 4,
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 2,
+                            }}>
+                                <div style={{
+                                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                                    color: 'var(--text-primary)', letterSpacing: 1, marginBottom: 2,
+                                }}>
+                                    {opt.label.replace(/_/g, ' ').toUpperCase()}
+                                </div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                    {opt.description}
+                                </div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>
+                                    {opt.distanceNM.toFixed(0)} NM
+                                    {opt.weatherExposureNM > 0 && (
+                                        <> · <span style={{ color: 'var(--amber)' }}>
+                                            {opt.weatherExposureNM.toFixed(0)} NM in storms
+                                        </span></>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        await fetch(`${BASE}/api/routes/${ship.shipId}/select`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ label: opt.label }),
+                                        });
+                                        setRouteOptions(null);
+                                    }}
+                                    style={{
+                                        marginTop: 4, width: '100%',
+                                        background: 'rgba(0, 212, 255, 0.15)',
+                                        border: '1px solid var(--cyan)',
+                                        color: 'var(--cyan)', padding: 4,
+                                        fontFamily: 'var(--font-mono)', fontSize: 9,
+                                        letterSpacing: 1, cursor: 'pointer', borderRadius: 2,
+                                    }}>
+                                    ▶ ADOPT THIS ROUTE
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div style={{ marginTop: 16, marginBottom: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', letterSpacing: 2 }}>

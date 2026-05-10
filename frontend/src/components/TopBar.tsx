@@ -2,8 +2,15 @@ import { useFleetStore } from '../store/fleetStore';
 import { LiveClock } from './LiveClock';
 import { RoleSwitcher } from './RoleSwitcher';
 
+function latencyColor(ms: number | null): string {
+    if (ms === null) return 'var(--text-dim)';
+    if (ms <= 500) return 'var(--green)';
+    if (ms <= 1000) return 'var(--amber)';
+    return 'var(--red)';
+}
+
 export function TopBar() {
-    const { ships, alerts, isConnected } = useFleetStore();
+    const { ships, alerts, isConnected, latencyMs } = useFleetStore();
 
     const critical = alerts.filter(a => a.severity === 'critical' && !a.acknowledged).length;
     const nominal = ships.filter(s => s.status === 'NOMINAL').length;
@@ -47,6 +54,18 @@ export function TopBar() {
                 <RoleSwitcher />
                 <div className="topbar-divider" />
                 <LiveClock />
+                <div className="topbar-divider" />
+                <div
+                    title={`Server→client latency. Spec target: ≤500ms 95% of the time.`}
+                    style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        color: latencyColor(latencyMs),
+                    }}
+                >
+                    {latencyMs === null ? '— ms' : `${latencyMs} ms`}
+                </div>
                 <div className="topbar-divider" />
                 <div className={`status-dot ${isConnected ? '' : 'offline'}`} />
                 <span className="status-label">{isConnected ? 'LIVE' : 'OFFLINE'}</span>

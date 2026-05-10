@@ -11,6 +11,7 @@ interface FleetState {
     captainShipId: string | null;
     playbackTime: number | null;
     isConnected: boolean;
+    latencyMs: number | null;
 
     setShips: (ships: Ship[]) => void;
     addAlert: (alert: Alert) => void;
@@ -24,6 +25,7 @@ interface FleetState {
     setRole: (role: UserRole, shipId?: string) => void;
     setPlaybackTime: (t: number | null) => void;
     setConnected: (v: boolean) => void;
+    setLatencyMs: (ms: number | null) => void;
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -36,15 +38,22 @@ export const useFleetStore = create<FleetState>((set) => ({
     captainShipId: null,
     playbackTime: null,
     isConnected: false,
+    latencyMs: null,
 
     setShips: (ships) => set({ ships }),
-    addAlert: (alert) => set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 200) })),
+    addAlert: (alert) => set((s) => {
+        if (s.alerts.some(a => a.id === alert.id)) return {};
+        return { alerts: [alert, ...s.alerts].slice(0, 200) };
+    }),
     setAlerts: (alerts) => set({ alerts }),
     acknowledgeAlert: (id) =>
         set((s) => ({
             alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
         })),
-    addZone: (zone) => set((s) => ({ zones: [...s.zones, zone] })),
+    addZone: (zone) => set((s) => {
+        if (s.zones.some(z => z.id === zone.id)) return {};
+        return { zones: [...s.zones, zone] };
+    }),
     setZones: (zones) => set({ zones }),
     removeZone: (id) => set((s) => ({ zones: s.zones.filter((z) => z.id !== id) })),
     setHistory: (snapshots) => set({ history: snapshots }),
@@ -52,4 +61,5 @@ export const useFleetStore = create<FleetState>((set) => ({
     setRole: (role, shipId) => set({ role, captainShipId: shipId || null }),
     setPlaybackTime: (t) => set({ playbackTime: t }),
     setConnected: (v) => set({ isConnected: v }),
+    setLatencyMs: (ms) => set({ latencyMs: ms }),
 }));
