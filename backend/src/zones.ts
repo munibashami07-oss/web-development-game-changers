@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { Router } from "express";
 
 export interface Zone {
     id: string;
@@ -21,14 +22,23 @@ export function addZone(data: { name?: string; polygon: [number, number][] }): Z
         createdAt: Date.now(),
     };
     zones.push(zone);
+    notifyZoneChanged();
     return zone;
 }
 
 export function removeZone(id: string) {
     zones = zones.filter((z) => z.id !== id);
+    notifyZoneChanged();
 }
 
-import { Router } from "express";
+function notifyZoneChanged() {
+    // Lazy require to avoid circular dep
+    try {
+        const { onZoneChanged } = require("./simulator");
+        onZoneChanged();
+    } catch { }
+}
+
 export const zonesRouter = Router();
 
 zonesRouter.get("/zones", (req, res) => {

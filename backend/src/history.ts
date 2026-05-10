@@ -4,7 +4,8 @@ interface Snapshot {
 }
 
 const snapshots: Snapshot[] = [];
-const MAX = 120;
+// 10s snapshots × 360 = last 1 hour
+const MAX = 360;
 
 export function saveSnapshot(ships: any[]) {
     snapshots.push({ timestamp: Date.now(), ships: JSON.parse(JSON.stringify(ships)) });
