@@ -1,7 +1,7 @@
 // src/components/AICommandBar.tsx
 import { useState } from 'react';
 
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+const BASE = (import.meta as any).env?.VITE_API_URL || 'https://precious-prosperity-production-4daa.up.railway.app';
 
 interface CommandResult {
     summary: string;
