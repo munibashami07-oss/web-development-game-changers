@@ -6,7 +6,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: './app.html'
+        main: './app.html',
+        landing: './index.html'
       }
     }
   }
