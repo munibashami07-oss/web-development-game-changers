@@ -1,7 +1,6 @@
 // src/components/AIBriefing.tsx
 import { useEffect, useState } from 'react';
-
-const BASE = (import.meta as any).env?.VITE_API_URL || 'https://precious-prosperity-production-4daa.up.railway.app';
+import { BACKEND as BASE } from '../lib/api';
 export function AIBriefing({ shipId }: { shipId: string }) {
     const [briefing, setBriefing] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);

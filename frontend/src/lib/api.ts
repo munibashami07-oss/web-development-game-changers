@@ -1,0 +1,1 @@
+export const BACKEND = 'https://precious-prosperity-production-4daa.up.railway.app';

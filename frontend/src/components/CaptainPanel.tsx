@@ -1,9 +1,7 @@
 // src/components/CaptainPanel.tsx
 import { useEffect, useState } from 'react';
 import { useFleetStore } from '../store/fleetStore';
-
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
-
+import { BACKEND as BASE } from '../lib/api';
 type AssistKind = 'fuel' | 'medical' | 'escort' | 'cargo';
 
 const KIND_LABEL: Record<AssistKind, string> = {
