@@ -126,7 +126,18 @@ app.post("/api/routes/:shipId/select", (req, res) => {
     if (!ok) return res.status(404).json({ error: "no matching route option" });
     res.json({ ok: true });
 });
-
+app.post("/api/ai/captain-reply/:shipId", async (req, res) => {
+    try {
+        const { message, history } = req.body;
+        const ship = getFleet().find(s => s.shipId === req.params.shipId);
+        if (!ship) return res.status(404).json({ error: "ship not found" });
+        const { captainReply } = require("./ai-captain");
+        const reply = await captainReply(ship, message, history || []);
+        res.json({ reply });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 app.get("/api/ai/briefing/:shipId", async (req, res) => {
     try {
         const ship = getFleet().find(s => s.shipId === req.params.shipId);

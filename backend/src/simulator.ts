@@ -327,6 +327,8 @@ function triggerRandomEvent() {
 export function applyDirective(shipId: string, type: string, payload: any = {}): boolean {
     const ship = fleet.find(s => s.shipId === shipId);
     if (!ship) return false;
+
+    // Set pendingDirective so a captain UI can still see it...
     ship.pendingDirective = {
         type,
         message: payload.message || type,
@@ -334,6 +336,57 @@ export function applyDirective(shipId: string, type: string, payload: any = {}):
         issuedAt: Date.now(),
         ...(payload.toPort && { toPort: payload.toPort }),
     };
+
+    // ...but ALSO execute immediately so Command sees ships react on the map.
+    if (type === "HOLD") {
+        ship.status = "anchored";
+        ship.path = [];
+        ship.pathTotal = [];
+        addAlert({
+            type: "DIRECTIVE_EXECUTED", shipId, severity: "low",
+            message: `${ship.name} holding position by Command order.`
+        });
+    } else if (type === "REROUTE") {
+        ship.status = "rerouting";
+        const opts = generateRouteOptions(shipId);
+        if (opts.length > 0) {
+            const safe = opts.find(o => o.label === "weather_safe") || opts[0];
+            selectRouteOption(shipId, safe.label);
+        }
+        addAlert({
+            type: "DIRECTIVE_EXECUTED", shipId, severity: "low",
+            message: `${ship.name} rerouting by Command order.`
+        });
+        setTimeout(() => { if (ship.status === "rerouting") ship.status = "normal"; }, 6000);
+    } else if (type === "DIVERT") {
+        ship.status = "rerouting";
+        const others = DEST_KEYS.filter(k => k !== ship.destination);
+        if (payload.toPort && PORTS[payload.toPort]) {
+            ship.destination = payload.toPort;
+        } else if (others.length > 0) {
+            ship.destination = others[Math.floor(Math.random() * others.length)];
+        }
+        const dest = PORTS[ship.destination];
+        if (dest) {
+            const path = require("./routing").findPath(ship.position, dest, getZones());
+            if (path && path.length >= 2) {
+                ship.path = path.slice(1);
+                ship.pathTotal = path;
+            }
+        }
+        addAlert({
+            type: "DIRECTIVE_EXECUTED", shipId, severity: "low",
+            message: `${ship.name} diverting to ${ship.destination}.`
+        });
+        setTimeout(() => { if (ship.status === "rerouting") ship.status = "normal"; }, 6000);
+    } else if (type === "EMERGENCY") {
+        ship.status = "critical";
+        addAlert({
+            type: "DIRECTIVE_EXECUTED", shipId, severity: "critical",
+            message: `${ship.name} executing emergency protocol.`
+        });
+    }
+
     return true;
 }
 

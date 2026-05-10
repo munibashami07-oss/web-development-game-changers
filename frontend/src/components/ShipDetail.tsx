@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useFleetStore } from '../store/fleetStore';
 import type { Ship } from '../types';
 import { api } from '../utils/api';
@@ -74,11 +74,7 @@ async function sendDirective(ship: any, type: string, message: string): Promise<
 export function ShipDetail() {
     const { ships, selectedShipId } = useFleetStore();
     const ship: any = ships.find(s => s.shipId === selectedShipId);
-
-    const [msg, setMsg] = useState('');
-    const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null);
-    const [sentTick, setSentTick] = useState(0);
     const [routeOptions, setRouteOptions] = useState<RouteCandidate[] | null>(null);
     const [loadingRoutes, setLoadingRoutes] = useState(false);
 
@@ -90,26 +86,7 @@ export function ShipDetail() {
             </div>
         );
     }
-    const sendMessage = async () => {
-        if (!msg.trim()) return;
-        setSending(true);
-        try {
-            await api.postAlert({
-                type: 'COMMAND_MESSAGE',
-                shipId: ship.shipId,
-                severity: 'medium',
-                message: `[CMD → ${ship.name}] ${msg}`,
-            });
-            setSentTick(Date.now());
-            setMsg('');
-            setTimeout(() => setSentTick(0), 2500);
-        } catch (err: any) {
-            setToast({ text: `✗ Failed to transmit: ${err?.message || 'unknown error'}`, kind: 'error' });
-            setTimeout(() => setToast(null), 4000);
-        } finally {
-            setSending(false);
-        }
-    };
+
     const destPort = ship.destination ? PORTS[ship.destination] : null;
     const distance = destPort ? haversine(ship.lat, ship.lng, destPort.lat, destPort.lng) : 0;
     const etaHours = ship.speed > 0 && distance > 0 ? distance / ship.speed : 0;
@@ -429,53 +406,130 @@ export function ShipDetail() {
                 )}
             </div>
 
-            <div style={{ marginTop: 16, marginBottom: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', letterSpacing: 2 }}>
-                ▸ DIRECT MESSAGE
-            </div>
+            <CaptainChat shipId={ship.shipId} shipName={ship.name} />
+        </div>
+    );
+}
+function CaptainChat({ shipId, shipName }: { shipId: string; shipName: string }) {
+    const [history, setHistory] = useState<{ role: 'command' | 'captain'; text: string; t: number }[]>([]);
+    const [input, setInput] = useState('');
+    const [waiting, setWaiting] = useState(false);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-            <div style={{
-                background: 'var(--bg-surface)',
+    // Load saved history per ship from localStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(`chat:${shipId}`);
+            if (raw) setHistory(JSON.parse(raw));
+            else setHistory([]);
+        } catch { setHistory([]); }
+    }, [shipId]);
+
+    useEffect(() => {
+        try { localStorage.setItem(`chat:${shipId}`, JSON.stringify(history.slice(-50))); } catch { }
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }, [history, shipId]);
+
+    const send = async () => {
+        if (!input.trim() || waiting) return;
+        const userMsg = { role: 'command' as const, text: input.trim(), t: Date.now() };
+        const next = [...history, userMsg];
+        setHistory(next);
+        setInput('');
+        setWaiting(true);
+        try {
+            const r = await fetch(`${BASE}/api/ai/captain-reply/${shipId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userMsg.text, history: next.slice(-8) }),
+            });
+            const data = await r.json();
+            const reply = data.reply || '(no reply)';
+            setHistory(h => [...h, { role: 'captain', text: reply, t: Date.now() }]);
+        } catch (err: any) {
+            setHistory(h => [...h, { role: 'captain', text: `[link down: ${err?.message || 'unknown error'}]`, t: Date.now() }]);
+        } finally {
+            setWaiting(false);
+        }
+    };
+
+    return (
+        <div style={{ marginTop: 16 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 8 }}>
+                ▸ COMMS CHANNEL — {shipName}
+            </div>
+            <div ref={scrollRef} style={{
+                background: 'var(--bg-void)',
                 border: '1px solid var(--border)',
                 borderRadius: 2,
                 padding: 8,
+                maxHeight: 240,
+                minHeight: 120,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
             }}>
-                <textarea
-                    value={msg}
-                    onChange={e => setMsg(e.target.value)}
-                    placeholder={`Compose message to ${ship.name}...`}
+                {history.length === 0 && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 12 }}>
+                        Channel open. Send first message to {shipName}.
+                    </div>
+                )}
+                {history.map((m, i) => (
+                    <div key={i} style={{
+                        alignSelf: m.role === 'command' ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        padding: '5px 8px',
+                        borderRadius: 4,
+                        background: m.role === 'command' ? 'rgba(0, 212, 255, 0.12)' : 'rgba(255, 102, 0, 0.10)',
+                        border: `1px solid ${m.role === 'command' ? 'var(--cyan)' : 'var(--orange)'}`,
+                    }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: 1.5, color: m.role === 'command' ? 'var(--cyan)' : 'var(--orange)', marginBottom: 2 }}>
+                            {m.role === 'command' ? 'CMD' : 'CAPT'}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                            {m.text}
+                        </div>
+                    </div>
+                ))}
+                {waiting && (
+                    <div style={{ alignSelf: 'flex-start', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', padding: '4px 8px' }}>
+                        ⋯ {shipName} is responding
+                    </div>
+                )}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && send()}
+                    placeholder={`Message ${shipName}...`}
                     style={{
-                        width: '100%',
-                        minHeight: 60,
+                        flex: 1,
                         background: 'var(--bg-void)',
                         border: '1px solid var(--border)',
                         color: 'var(--text-primary)',
                         fontFamily: 'var(--font-mono)',
                         fontSize: 12,
-                        padding: 8,
-                        resize: 'vertical',
-                        outline: 'none',
+                        padding: 6,
                         borderRadius: 2,
+                        outline: 'none',
                     }}
                 />
-                <button
-                    onClick={sendMessage}
-                    disabled={sending || !msg.trim()}
-                    style={{
-                        width: '100%',
-                        marginTop: 6,
-                        background: sentTick ? 'rgba(0, 255, 136, 0.15)' : 'rgba(0, 212, 255, 0.12)',
-                        border: `1px solid ${sentTick ? 'var(--green)' : 'var(--cyan)'}`,
-                        color: sentTick ? 'var(--green)' : 'var(--cyan)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        letterSpacing: 2,
-                        padding: '8px',
-                        cursor: !msg.trim() || sending ? 'not-allowed' : 'pointer',
-                        opacity: !msg.trim() ? 0.4 : 1,
-                        borderRadius: 2,
-                    }}
-                >
-                    {sentTick ? '✓ TRANSMITTED' : sending ? 'TRANSMITTING...' : `▶ TRANSMIT TO ${ship.shipId}`}
+                <button onClick={send} disabled={waiting || !input.trim()} style={{
+                    background: 'rgba(0, 212, 255, 0.15)',
+                    border: '1px solid var(--cyan)',
+                    color: 'var(--cyan)',
+                    padding: '6px 12px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    cursor: waiting || !input.trim() ? 'not-allowed' : 'pointer',
+                    opacity: !input.trim() ? 0.4 : 1,
+                    borderRadius: 2,
+                }}>
+                    {waiting ? '...' : 'SEND'}
                 </button>
             </div>
         </div>
