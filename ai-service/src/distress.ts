@@ -3,13 +3,16 @@ import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: "https://integrate.api.nvidia.com/v1",
+});
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3001";
 
 export async function processDistress(shipId: string, message: string) {
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "meta/llama-3.3-70b-instruct",
             max_tokens: 500,
             messages: [
                 {
